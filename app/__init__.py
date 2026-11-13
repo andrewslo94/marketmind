@@ -7,7 +7,7 @@ apps for testing and to plug in blueprints, the database, and login later.
 """
 import os
 
-from flask import Flask, render_template
+from flask import Flask
 
 from config import Config
 
@@ -28,9 +28,10 @@ def create_app(config_class=Config):
     # Create the instance/ folder if it doesn't exist yet.
     os.makedirs(app.instance_path, exist_ok=True)
 
-    # Temporary home route. In Phase 1B this moves into a "main" blueprint.
-    @app.route("/")
-    def home():
-        return render_template("home.html")
+    # Register blueprints (groups of routes). Imported here, inside the
+    # function, so each blueprint is loaded when the app is built.
+    from app.routes.main import main_bp
+
+    app.register_blueprint(main_bp)
 
     return app

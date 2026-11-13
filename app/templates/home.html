@@ -1,32 +1,64 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MarketMind</title>
-    <!-- Temporary inline styling. Phase 1B replaces this with a shared base
-         layout, Bootstrap 5, and the dark fintech theme. -->
-    <style>
-        body {
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #0d1117;
-            color: #e6edf3;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        .card { text-align: center; padding: 2rem 3rem; border: 1px solid #30363d; border-radius: 12px; background: #161b22; }
-        h1 { margin: 0 0 .5rem; color: #3fb950; }
-        p  { margin: .25rem 0; color: #8b949e; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>MarketMind</h1>
-        <p>Investment research &amp; portfolio intelligence</p>
-        <p>Phase 1A: the Flask app is running.</p>
+{# home.html — inherits the shared layout from base.html and fills its blocks. #}
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<!-- ===== Hero ===== -->
+<section class="mm-hero mb-5">
+    <span class="mm-eyebrow">Portfolio intelligence · Market research</span>
+    <h1 class="display-5 fw-bold mt-2">Research the market with evidence, not hype.</h1>
+    <p class="lead mm-muted col-lg-8">
+        MarketMind brings your holdings, company news, and economic data into one place,
+        and shows the facts and the reasoning behind every insight.
+    </p>
+</section>
+
+<!-- ===== Planned features (status shown honestly; none are clickable yet) ===== -->
+<section class="mb-5">
+    <h2 class="h5 mm-section-title">What's being built</h2>
+    <div class="row g-3">
+        {% set features = [
+            ("Portfolio Tracker", "Track holdings, returns, daily gain/loss, and allocation.", "Phase 3"),
+            ("Personalized News", "News on your holdings, with summaries and sentiment explained.", "Phase 4"),
+            ("Market Intelligence", "Indexes, Treasury yields, commodities, and sector impact of major news.", "Phase 5"),
+            ("Research Engine", "Companies worth researching, with a transparent confidence score.", "Phase 6"),
+            ("Insights", "Built-in questions answered from your real portfolio data.", "Phase 7"),
+        ] %}
+        {% for name, desc, phase in features %}
+        <div class="col-md-6 col-lg-4">
+            <div class="mm-card h-100">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h3 class="h6 fw-semibold mb-0">{{ name }}</h3>
+                    <span class="badge mm-badge-planned">Planned · {{ phase }}</span>
+                </div>
+                <p class="mm-muted small mb-0">{{ desc }}</p>
+            </div>
+        </div>
+        {% endfor %}
     </div>
-</body>
-</html>
+</section>
+
+<!-- ===== Principles ===== -->
+<section>
+    <h2 class="h5 mm-section-title">How MarketMind handles data</h2>
+    <div class="row g-3">
+        {% set principles = [
+            ("Real data only", "No made-up numbers. If a source has no data, you'll see \"Data unavailable.\""),
+            ("Facts vs. interpretation", "Headlines and numbers are kept visually separate from analysis."),
+            ("Timestamps & delays", "Every price will show its source, time, and a delayed-data label."),
+            ("No buy/sell calls", "Research and education, never trading recommendations."),
+        ] %}
+        {% for title, text in principles %}
+        <div class="col-sm-6 col-lg-3">
+            <div class="mm-principle h-100">
+                <h3 class="h6 fw-semibold">{{ title }}</h3>
+                <p class="mm-muted small mb-0">{{ text }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+{% endblock %}

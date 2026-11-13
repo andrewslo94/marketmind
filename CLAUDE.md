@@ -170,5 +170,6 @@ Watchlists, price alerts, earnings calendar, economic events calendar, dividend 
 - Organized so it could grow into a commercial product.
 
 ## 9. Current status
-- Phase 1A (2026-11-12): **files created, awaiting user test.** Project folder `marketmind/`, `.venv` (Python 3.13), `.env` with SECRET_KEY, `.gitignore`, `config.py`, `app/__init__.py` (create_app with temporary home route), `app/templates/home.html`, `run.py` (port 5001), `DEVLOG.md`. Flask 3.1.3 + python-dotenv 1.2.4 installed; `requirements.txt` created. Home page verified (200) with the test client; waiting for the user to confirm in the browser.
-- Next: Phase 1B — main blueprint, base layout with nav, Bootstrap 5 dark theme. Then git init + create GitHub account and push.
+- Phase 1A (2026-11-12): **done.** Project folder, `.venv` (Python 3.13), `.env`, `.gitignore`, `config.py`, app factory, `run.py` (port 5001), Flask 3.1.3 + python-dotenv 1.2.4 in `requirements.txt`.
+- Phase 1B (2026-11-12): **files created, awaiting user test.** `main` blueprint (`app/routes/main.py`), `base.html` layout (navbar, footer, Bootstrap 5.3.3 CDN, dark mode), `static/css/style.css` theme, new `home.html`.
+- Next: create a GitHub account, push the repo (Phase 1C). Then Phase 2 (database, registration/login).
