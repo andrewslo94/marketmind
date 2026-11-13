@@ -36,3 +36,17 @@ A record of how MarketMind was built with AI assistance (Claude Code).
 **Testing**
 - Flask test client: `/` returns 200 and the Home link is highlighted as active, `/static/css/style.css` returns 200, and an unknown URL returns 404.
 - Checked the Bootstrap CDN SRI hashes against the live files. Both match.
+
+---
+
+## 2026-11-12 — Phase 1C: GitHub
+
+**What we did**
+- Created a GitHub account and published the repository (private for now) from VS Code using **Publish to GitHub**, which handles sign-in through the browser. No GitHub CLI or Homebrew needed.
+- Verified on github.com that `.env` and `.venv/` are not in the repo (kept out by `.gitignore`) and that both Phase 1A and 1B commits are there.
+
+**Notes**
+- Found that Phase 1B had not been committed yet (`git status` showed modified and untracked files), so we committed it before publishing.
+- From here on, each step ends with `git add .`, `git commit -m "..."`, `git push`.
+
+Phase 1 complete.

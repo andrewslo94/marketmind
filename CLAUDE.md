@@ -170,6 +170,5 @@ Watchlists, price alerts, earnings calendar, economic events calendar, dividend 
 - Organized so it could grow into a commercial product.
 
 ## 9. Current status
-- Phase 1A (2026-11-12): **done.** Project folder, `.venv` (Python 3.13), `.env`, `.gitignore`, `config.py`, app factory, `run.py` (port 5001), Flask 3.1.3 + python-dotenv 1.2.4 in `requirements.txt`.
-- Phase 1B (2026-11-12): **files created, awaiting user test.** `main` blueprint (`app/routes/main.py`), `base.html` layout (navbar, footer, Bootstrap 5.3.3 CDN, dark mode), `static/css/style.css` theme, new `home.html`.
-- Next: create a GitHub account, push the repo (Phase 1C). Then Phase 2 (database, registration/login).
+- **Phase 1 complete (2026-11-12).** 1A: venv, `.env`, config, app factory, `run.py` on port 5001, Flask 3.1.3 + python-dotenv. 1B: `main` blueprint, `base.html` layout (navbar, footer, Bootstrap 5.3.3, dark theme in `static/css/style.css`), new `home.html`. 1C: private GitHub repo `marketmind` published from VS Code; both commits verified online.
+- **Next: Phase 2A** — install Flask-SQLAlchemy + Flask-Login, add `app/extensions.py`, `app/models.py` (User table), database config in `config.py`, and create the SQLite DB in `instance/`. Then 2B: registration/login/logout pages.
