@@ -171,4 +171,5 @@ Watchlists, price alerts, earnings calendar, economic events calendar, dividend 
 
 ## 9. Current status
 - **Phase 1 complete (2026-11-12).** 1A: venv, `.env`, config, app factory, `run.py` on port 5001, Flask 3.1.3 + python-dotenv. 1B: `main` blueprint, `base.html` layout (navbar, footer, Bootstrap 5.3.3, dark theme in `static/css/style.css`), new `home.html`. 1C: private GitHub repo `marketmind` published from VS Code; both commits verified online.
-- **Next: Phase 2A** — install Flask-SQLAlchemy + Flask-Login, add `app/extensions.py`, `app/models.py` (User table), database config in `config.py`, and create the SQLite DB in `instance/`. Then 2B: registration/login/logout pages.
+- **Phase 2A complete (2026-11-14).** Flask-SQLAlchemy 3.1.1 + Flask-Login 0.6.3 installed. `app/extensions.py` (db, login_manager), `app/models.py` (User table with Werkzeug password hashing + user_loader), `SQLALCHEMY_DATABASE_URI` in `config.py`, `db.create_all()` in the factory. SQLite DB created at `instance/marketmind.db`.
+- **Next: Phase 2B** — `auth` blueprint with registration, login, and logout pages (forms with validation, flash messages), navbar shows login state.
