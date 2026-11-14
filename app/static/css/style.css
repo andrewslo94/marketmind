@@ -97,6 +97,34 @@ body {
     white-space: nowrap;
 }
 
+/* ---- Auth pages & navbar user chip ---- */
+.mm-auth-card { padding: 2rem; }
+.mm-nav-user {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--mm-text) !important;
+}
+.mm-avatar {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--mm-border);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.form-control {
+    background: var(--mm-bg);
+    border-color: var(--mm-border);
+}
+.form-control:focus {
+    background: var(--mm-bg);
+    border-color: var(--mm-accent);
+    box-shadow: 0 0 0 0.2rem rgba(34, 197, 94, 0.2);
+}
+
 /* ---- Footer ---- */
 .mm-footer {
     background: var(--mm-surface);

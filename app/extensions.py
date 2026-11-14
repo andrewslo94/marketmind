@@ -8,6 +8,7 @@ so `db` must live in a neutral module that neither of them depends on.
 """
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 
 # db: the database handle. Models are defined as classes that extend db.Model.
 db = SQLAlchemy()
@@ -21,3 +22,7 @@ login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 login_manager.login_message = "Please log in to access that page."
 login_manager.login_message_category = "warning"
+
+# csrf: makes csrf_token() available in templates and checks every POST.
+# Flask-WTF forms carry the token automatically via form.hidden_tag().
+csrf = CSRFProtect()

@@ -9,7 +9,7 @@ import os
 
 from flask import Flask
 
-from app.extensions import db, login_manager
+from app.extensions import csrf, db, login_manager
 from config import Config
 
 
@@ -32,6 +32,7 @@ def create_app(config_class=Config):
     # Attach the extensions (created in app/extensions.py) to this app.
     db.init_app(app)
     login_manager.init_app(app)
+    csrf.init_app(app)
 
     # Import the models so SQLAlchemy knows which tables exist, then create
     # any tables that are missing. Existing tables and data are left alone.
@@ -42,8 +43,10 @@ def create_app(config_class=Config):
 
     # Register blueprints (groups of routes). Imported here, inside the
     # function, so each blueprint is loaded when the app is built.
+    from app.routes.auth import auth_bp
     from app.routes.main import main_bp
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp)
 
     return app

@@ -68,3 +68,25 @@ Phase 1 complete.
 
 **Notes**
 - `instance/` is git-ignored, so the database file never goes to GitHub.
+
+---
+
+## 2026-11-14 — Phase 2B: Registration, login, logout
+
+**What we built**
+- Installed **Flask-WTF 1.3.0** (forms + CSRF protection) and **email-validator 2.4.0** (needed by the Email validator). `requirements.txt` updated.
+- `app/forms.py`: `RegistrationForm` (username 3–30 chars, letters/numbers/underscore; valid email; password ≥ 8 chars; confirm must match; username and email must be unused) and `LoginForm` (username, password, "keep me logged in").
+- `app/routes/auth.py`: the `auth` blueprint with `/register`, `/login`, and `/logout`. Login uses one generic "Invalid username or password" message so the page can't be used to discover which usernames exist. The `?next=` redirect is only followed if it is a relative path on our own site. Logout is POST-only.
+- `app/templates/auth/`: `register.html`, `login.html`, and a `_form_field.html` macro that renders a field with its label and error messages (so both pages share one piece of markup).
+- `app/templates/base.html`: navbar now shows "Log in / Create account" when logged out and the username + a "Log out" button when logged in. Added a flash-message area above the page content.
+- `app/extensions.py` + `app/__init__.py`: added `CSRFProtect`, registered the auth blueprint.
+- `style.css`: dark-theme styling for form inputs, the auth card, and the navbar user chip.
+
+**Decisions**
+- Flask-WTF instead of hand-written forms, for CSRF protection and declarative validation.
+- Emails are stored lowercased so `Demo@Example.com` and `demo@example.com` are the same account.
+
+**Testing (Flask test client)**
+- Register/login pages load (200). Bad input shows all three validation errors. Good registration redirects to login with a success flash and stores a scrypt hash, not the password. Duplicate username/email are rejected.
+- Wrong password returns 401 with the generic message. Correct login shows the username and Log out button in the navbar. GET /logout is blocked (405); POST logs out; POST while logged out redirects to login.
+- A POST without a CSRF token is rejected with 400, and the token is present in the rendered form.
