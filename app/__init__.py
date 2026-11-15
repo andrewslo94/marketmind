@@ -45,8 +45,10 @@ def create_app(config_class=Config):
     # function, so each blueprint is loaded when the app is built.
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
+    from app.routes.portfolio import portfolio_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(portfolio_bp)
 
     return app

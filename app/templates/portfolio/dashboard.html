@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Portfolio{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+        <p class="mm-eyebrow mb-1">Section A</p>
+        <h1 class="h3 mb-0">Your portfolio</h1>
+    </div>
+    <a class="btn btn-success" href="{{ url_for('portfolio.add_holding') }}">+ Add holding</a>
+</div>
+
+{# ---- Summary cards. Only numbers we actually have: live value, P/L and
+      daily change need market prices, which arrive in Phase 3B. ---- #}
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="mm-card mm-stat">
+            <div class="mm-stat-label">Holdings</div>
+            <div class="mm-stat-value">{{ holdings|length }}</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="mm-card mm-stat">
+            <div class="mm-stat-label">Total invested (cost basis)</div>
+            <div class="mm-stat-value">{{ total_invested|money }}</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="mm-card mm-stat mm-stat-pending">
+            <div class="mm-stat-label">Current value</div>
+            <div class="mm-stat-value mm-muted">—</div>
+            <div class="mm-stat-note">Needs live prices · Phase 3B</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="mm-card mm-stat mm-stat-pending">
+            <div class="mm-stat-label">Unrealized P/L</div>
+            <div class="mm-stat-value mm-muted">—</div>
+            <div class="mm-stat-note">Needs live prices · Phase 3B</div>
+        </div>
+    </div>
+</div>
+
+{% if holdings %}
+<div class="mm-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 mm-table">
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th class="text-end">Shares</th>
+                    <th class="text-end">Avg. price</th>
+                    <th class="text-end">Cost basis</th>
+                    <th>Purchased</th>
+                    <th>Notes</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in holdings %}
+                <tr>
+                    <td><span class="mm-ticker">{{ h.ticker }}</span></td>
+                    <td class="text-end">{{ h.shares|shares }}</td>
+                    <td class="text-end">{{ h.avg_price|money }}</td>
+                    <td class="text-end fw-semibold">{{ h.cost_basis|money }}</td>
+                    <td class="mm-muted">
+                        {{ h.purchase_date.strftime("%b %d, %Y") if h.purchase_date else "—" }}
+                    </td>
+                    <td class="mm-muted small">{{ h.notes or "" }}</td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-outline-secondary btn-sm"
+                           href="{{ url_for('portfolio.edit_holding', holding_id=h.id) }}">Edit</a>
+                        {# Delete is a POST form; the confirm() dialog is a
+                           simple browser prompt to prevent accidental clicks. #}
+                        <form method="post" class="d-inline"
+                              action="{{ url_for('portfolio.delete_holding', holding_id=h.id) }}"
+                              onsubmit="return confirm('Remove {{ h.ticker }} from your portfolio?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<p class="small mm-muted mt-3 mb-0">
+    Cost basis = shares × average purchase price, calculated from the values you entered.
+    Market prices, gains/losses, and allocation charts are added in Phase 3B.
+</p>
+{% else %}
+<div class="mm-card text-center py-5">
+    <h2 class="h5 mb-2">No holdings yet</h2>
+    <p class="mm-muted mb-4">
+        Add the stocks you own to start tracking your portfolio.
+    </p>
+    <a class="btn btn-success" href="{{ url_for('portfolio.add_holding') }}">Add your first holding</a>
+</div>
+{% endif %}
+{% endblock %}

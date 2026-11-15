@@ -90,3 +90,28 @@ Phase 1 complete.
 - Register/login pages load (200). Bad input shows all three validation errors. Good registration redirects to login with a success flash and stores a scrypt hash, not the password. Duplicate username/email are rejected.
 - Wrong password returns 401 with the generic message. Correct login shows the username and Log out button in the navbar. GET /logout is blocked (405); POST logs out; POST while logged out redirects to login.
 - A POST without a CSRF token is rejected with 400, and the token is present in the rendered form.
+
+---
+
+## 2026-11-15 — Phase 3A: Holding table and portfolio CRUD (no live prices yet)
+
+**Before starting:** confirmed Phase 2B in the browser (validation errors, registration, duplicate check, bad login, good login, logout). All six steps passed.
+
+**What we built**
+- `app/models.py`: new `Holding` table (user_id FK → users with ON DELETE CASCADE, ticker, shares, avg_price, optional purchase_date and notes, created_at/updated_at). A `UniqueConstraint(user_id, ticker)` means one row per stock per user. `cost_basis` is a `@property` (shares × avg price) calculated on the fly, never stored. `user.holdings` / `holding.owner` relationship with cascade delete.
+- `app/forms.py`: `HoldingForm`. Ticker is trimmed and upper-cased by a filter, then checked against a regex (1–5 letters, optional `.B`-style suffix). Shares and price use `DecimalField` + `NumberRange` (> 0). `DateField` with `Optional()`; future dates rejected. `validate_ticker` rejects a ticker the user already holds, except the row being edited (`holding_id` passed in).
+- `app/routes/portfolio.py`: `portfolio` blueprint at `/portfolio` with dashboard, add, edit, and POST-only delete. Every query filters by `current_user.id`; a helper returns 404 for any holding the user doesn't own. Also registers two app-wide Jinja filters, `money` and `shares`, for consistent number formatting in later phases.
+- `app/templates/portfolio/dashboard.html` (summary cards + holdings table + empty state) and `holding_form.html` (shared by add and edit; reuses the `render_field` macro from `auth/`).
+- Hookups: blueprint registered in `app/__init__.py`; "Portfolio" nav link in `base.html` shown only when logged in; stat-card and table styles in `style.css`.
+
+**Decisions**
+- Ticker *format* only is validated in 3A. Checking that a ticker really exists needs the market-data service, which is 3B.
+- "Current value" and "Unrealized P/L" cards are shown as dashed placeholders labeled "Needs live prices · Phase 3B" rather than fake numbers, per the no-invented-data rule.
+- Float columns (not Numeric) for shares/price: SQLite has no native decimal type, and Phase 3 calculations run in pandas floats anyway.
+
+**Testing (Flask test client, in-memory DB)**
+- Logged-out `/portfolio/` redirects to login with `?next=`. Empty state renders. Bad input (ticker `apple!`, 0 shares, negative price, future date) shows all four errors. ` aapl ` is stored as `AAPL`; `brk.b` as `BRK.B`. Duplicate ticker rejected on add and on edit-to-existing. Dashboard totals correct ($1,502.50 + $1,000.00 = $2,502.50). Edit pre-fills and updates. A second user gets 404 on another user's edit/delete and sees an empty table. GET delete is 405; POST delete works. Deleting a user cascades to their holdings.
+- Real app started: `holdings` table created in `instance/marketmind.db` alongside `users`.
+
+**Problems**
+- One test assertion failed on `can't` because Jinja HTML-escapes the apostrophe as `&#39;`. The page displays correctly; only the test string needed changing.

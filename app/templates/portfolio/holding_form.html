@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "auth/_form_field.html" import render_field %}
+{% block title %}{{ "Edit holding" if mode == "edit" else "Add holding" }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+        <div class="mm-card mm-auth-card">
+            <p class="mm-eyebrow mb-1">Portfolio</p>
+            <h1 class="h3 mb-1">
+                {% if mode == "edit" %}Edit {{ holding.ticker }}{% else %}Add a holding{% endif %}
+            </h1>
+            <p class="mm-muted small mb-4">
+                Enter the position as it appears in your brokerage account.
+                Ticker format is checked now; live price lookup is added in Phase 3B.
+            </p>
+
+            <form method="post" novalidate>
+                {{ form.hidden_tag() }}
+                {{ render_field(form.ticker) }}
+                <div class="row">
+                    <div class="col-sm-6">{{ render_field(form.shares) }}</div>
+                    <div class="col-sm-6">{{ render_field(form.avg_price) }}</div>
+                </div>
+                {{ render_field(form.purchase_date) }}
+                {{ render_field(form.notes) }}
+                <div class="d-flex gap-2 mt-2">
+                    {{ form.submit(class="btn btn-success flex-grow-1") }}
+                    <a class="btn btn-outline-secondary" href="{{ url_for('portfolio.dashboard') }}">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

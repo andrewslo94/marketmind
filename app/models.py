@@ -56,3 +56,69 @@ def load_user(user_id: str):
     request it calls this function to turn that id back into a User object.
     """
     return db.session.get(User, int(user_id))
+
+
+class Holding(db.Model):
+    """
+    One stock position in a user's portfolio, e.g. "10 shares of AAPL bought
+    at an average of $150.00".
+
+    One row per (user, ticker). If a user buys the same stock again, they
+    update the share count and average price instead of adding a second row.
+    Live prices are NOT stored here: they change constantly, so they are
+    fetched (and cached) by a service in Phase 3B, not kept in the database.
+    """
+
+    __tablename__ = "holdings"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # ForeignKey: this column must match the id of a row in the users table.
+    # ondelete="CASCADE" + the relationship below mean deleting a user also
+    # deletes that user's holdings, so no orphan rows are left behind.
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    ticker = db.Column(db.String(10), nullable=False)
+    # Float is used for shares and price. Fractional shares (e.g. 2.5) are
+    # common with modern brokers, and every calculation in Phase 3 runs in
+    # pandas, which works in floats anyway.
+    shares = db.Column(db.Float, nullable=False)
+    avg_price = db.Column(db.Float, nullable=False)
+    # Optional: not everyone remembers when they bought.
+    purchase_date = db.Column(db.Date, nullable=True)
+    notes = db.Column(db.String(200), nullable=True)
+
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    # Database-level rule: the same user can't have two rows for one ticker.
+    # The form checks this too (friendlier message); this is the safety net.
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "ticker", name="uq_holding_user_ticker"),
+    )
+
+    # relationship(): lets us write `holding.owner` to get the User, and
+    # `user.holdings` to get a list of that user's Holding rows.
+    owner = db.relationship(
+        "User",
+        backref=db.backref(
+            "holdings", lazy=True, cascade="all, delete-orphan", order_by="Holding.ticker"
+        ),
+    )
+
+    # @property makes a method usable like an attribute: holding.cost_basis
+    # (no parentheses). It is calculated on the fly, never stored.
+    @property
+    def cost_basis(self) -> float:
+        """Total amount invested in this position: shares x average price."""
+        return self.shares * self.avg_price
+
+    def __repr__(self) -> str:
+        return f"<Holding {self.ticker} x{self.shares} (user {self.user_id})>"
