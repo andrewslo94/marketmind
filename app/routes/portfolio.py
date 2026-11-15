@@ -6,12 +6,13 @@ by current_user.id, so a user can only ever see or change their own rows.
 Phase 3A stores positions only; live prices and gain/loss arrive in 3B via
 a market-data service (routes never call external APIs directly).
 """
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.forms import HoldingForm
 from app.models import Holding
+from app.services.market_data import get_quote, normalize_ticker
 
 portfolio_bp = Blueprint("portfolio", __name__, url_prefix="/portfolio")
 
@@ -49,6 +50,16 @@ def _get_own_holding(holding_id: int) -> Holding:
     return holding
 
 
+def _warn_if_unverified(form: HoldingForm) -> None:
+    """The form sets ticker_unverified when the data provider was unreachable."""
+    if getattr(form, "ticker_unverified", False):
+        flash(
+            f"Could not verify {form.ticker.data} with the data provider right now. "
+            "It was saved, but double-check the symbol.",
+            "warning",
+        )
+
+
 # ---------- Routes ----------
 @portfolio_bp.route("/")
 @login_required
@@ -82,6 +93,7 @@ def add_holding():
         db.session.add(holding)
         db.session.commit()
         flash(f"Added {holding.ticker} to your portfolio.", "success")
+        _warn_if_unverified(form)
         return redirect(url_for("portfolio.dashboard"))
 
     return render_template("portfolio/holding_form.html", form=form, mode="add")
@@ -101,6 +113,7 @@ def edit_holding(holding_id: int):
         holding.notes = (form.notes.data or "").strip() or None
         db.session.commit()
         flash(f"Updated {holding.ticker}.", "success")
+        _warn_if_unverified(form)
         return redirect(url_for("portfolio.dashboard"))
 
     return render_template(
@@ -119,3 +132,39 @@ def delete_holding(holding_id: int):
     db.session.commit()
     flash(f"Removed {ticker} from your portfolio.", "info")
     return redirect(url_for("portfolio.dashboard"))
+
+
+# ---------- JSON helper for the add/edit form ----------
+# The form's JavaScript calls this when the ticker field loses focus, to
+# show the company name and current (delayed) price. jsonify() turns a dict
+# into an HTTP response with JSON text, which the browser's fetch() reads.
+# Goes through the cache like everything else, so typing AAPL twice costs
+# one provider call at most every 15 minutes.
+@portfolio_bp.route("/quote/<ticker>")
+@login_required
+def quote_lookup(ticker: str):
+    ticker = normalize_ticker(ticker)
+    if not (1 <= len(ticker) <= 10):
+        return jsonify(ok=False, reason="invalid"), 400
+    try:
+        result = get_quote(ticker)
+    except Exception:  # noqa: BLE001 — provider unreachable, no cached copy
+        return jsonify(ok=False, reason="unavailable"), 503
+
+    q = result.value
+    if q is None:
+        return jsonify(ok=False, reason="not_found", ticker=ticker), 404
+
+    return jsonify(
+        ok=True,
+        ticker=q["ticker"],
+        name=q["name"],
+        price=q["price"],
+        currency=q["currency"],
+        market_time=q["market_time"],      # Yahoo's quote timestamp (UTC ISO)
+        market_state=q["market_state"],
+        fetched_at=result.fetched_at.isoformat(),
+        stale=result.stale,
+        delayed=True,
+        source=q["source"],
+    )

@@ -115,3 +115,33 @@ Phase 1 complete.
 
 **Problems**
 - One test assertion failed on `can't` because Jinja HTML-escapes the apostrophe as `&#39;`. The page displays correctly; only the test string needed changing.
+
+---
+
+## 2026-11-15 — Phase 3B: yfinance market data + caching
+
+**Before starting:** Logan confirmed the Phase 3A browser test (all seven steps) and committed 335577b. Approved installing yfinance + pandas when asked.
+
+**What we built**
+- Installed **yfinance 1.8.0** (released 2026-11-03) and **pandas 3.1.1** (plus numpy, requests, curl_cffi as dependencies). `requirements.txt` refreshed. Checked the yfinance changelog first: 1.0 declared "no breaking changes", and `Ticker.info` / `history()` are unchanged through 1.8.0.
+- `app/services/__init__.py`: the services layer (routes → services → provider; routes never call APIs directly).
+- `app/models.py`: `CacheEntry` table (key, JSON value, fetched_at). A database-backed cache survives the dev server's auto-restarts, so prices fetched before the demo are still there when it starts.
+- `app/services/cache.py`: `get_or_fetch(key, ttl_seconds, fetch)`. Checks memory → `cache_entries` → provider. Returns a `CacheResult` dataclass (value, fetched_at, from_cache, stale, error). If the provider fails and a stale copy exists, the stale copy is served with `stale=True` so the UI can say "last updated X ago" instead of breaking.
+- `app/services/market_data.py`: `get_quote` (built from `Ticker.info`: price, previous close, open, day high/low, volume, market cap, 52-week range, name, sector, industry, exchange, Yahoo's quote timestamp, market state; always `source` + `delayed=True`), `get_quotes` (batch, each cached), `ticker_exists` (True / False / None = unreachable), `get_history(ticker, range)` with the 8 UI ranges mapped to yfinance period/interval and per-range TTLs (10 min intraday → 24 h for 5Y/MAX), and `history_dataframe` to rebuild a pandas frame from the cached JSON rows. Only EQUITY and ETF quote types are accepted.
+- `app/forms.py`: `HoldingForm.validate_ticker` now also asks `ticker_exists`. Unknown → "was not found as a stock or ETF symbol". Provider unreachable → the holding is still saved and `routes/portfolio.py` flashes a "could not verify" warning (small helper added there).
+
+**About the provider (for the write-up)**
+- yfinance is unofficial and free, no API key. Yahoo's terms: personal use only. Quotes are delayed; rate limits are undocumented and Yahoo temporarily blocks IPs that call too often (`YFRateLimitError`). Hence: every call goes through the cache, quotes have a 15-minute TTL, and nothing is ever fetched twice within a TTL.
+
+**Testing (in-memory DB + live Yahoo calls)**
+- Cache: second call is a hit; survives clearing memory (DB layer); refetches after TTL; serves stale copy with error text when the fetcher raises; raises if there is no copy at all.
+- AAPL quote fetched in ~0.5 s, second call < 0.05 s from cache, row present in `cache_entries`. Unknown symbol → None. SPY accepted as ETF. Batch of three all served from cache.
+- History: all 8 ranges returned data (1D: 78 five-minute bars … MAX: 503 monthly bars back to 1985). Unknown ticker → empty DataFrame. Bad range key → ValueError.
+- Form: `ZZZZQ` rejected with the not-found message; `msft` saved as MSFT with no warning.
+- Real app boots and `cache_entries` now exists in `instance/marketmind.db`.
+
+**Notes / nuances**
+- The last 5-minute bar of the 1D range (15:55 ET) can differ by a few cents from the official closing price in the quote; both are correct, they're different prints.
+- yfinance logs an `HTTP Error 404` line for unknown symbols. That's the provider saying "not found", not an app error.
+
+**Addendum (same day) — price auto-fill on the holding form.** Logan asked that entering a valid ticker fill in its current price. Added `GET /portfolio/quote/<ticker>` (login-required, returns JSON via the cache: name, price, currency, Yahoo quote time, market state, stale flag, source, `delayed: true`), a `{% block scripts %}` hook in `base.html`, `static/js/holding_form.js` (looks up the ticker on blur/Enter with `fetch()`, shows a labeled "Delayed data" quote box, fills the price box only if it is empty or still holds our previous auto-fill, and tells the user to change it to what they actually paid), and quote-box styles. Tested: 200/404/400/302 responses and the rendered form markup. Design note: the auto-filled value is today's delayed price, not the purchase price, and the box says so.

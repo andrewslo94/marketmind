@@ -142,6 +142,7 @@ class HoldingForm(FlaskForm):
         ignores the row currently being edited."""
         super().__init__(*args, **kwargs)
         self.holding_id = holding_id
+        self.ticker_unverified = False
 
     def validate_ticker(self, field):
         existing = Holding.query.filter_by(
@@ -151,6 +152,22 @@ class HoldingForm(FlaskForm):
             raise ValidationError(
                 f"{field.data} is already in your portfolio. Edit that holding instead."
             )
+
+        # Live check (Phase 3B): does Yahoo Finance know this symbol as a
+        # stock or ETF? Goes through the cache, so repeats are free.
+        # Imported here (not at the top) so forms.py doesn't load yfinance
+        # just to render the login page.
+        from app.services.market_data import ticker_exists
+
+        known = ticker_exists(field.data)
+        if known is False:
+            raise ValidationError(
+                f"{field.data} was not found as a stock or ETF symbol. "
+                "Check the spelling (e.g. GOOGL, not GOOGLE)."
+            )
+        # known is None -> provider unreachable. We don't block the user;
+        # the route shows a warning that the symbol could not be verified.
+        self.ticker_unverified = known is None
 
     def validate_purchase_date(self, field):
         if field.data and field.data > date.today():

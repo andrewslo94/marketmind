@@ -122,3 +122,24 @@ class Holding(db.Model):
 
     def __repr__(self) -> str:
         return f"<Holding {self.ticker} x{self.shares} (user {self.user_id})>"
+
+
+class CacheEntry(db.Model):
+    """
+    One cached API response, stored as JSON text.
+
+    Why cache in the database instead of only in memory? The Flask dev
+    server restarts whenever a file changes, which would wipe a memory-only
+    cache. A DB cache survives restarts, so prices fetched before a demo
+    are still there when the demo starts. (services/cache.py keeps a small
+    in-memory copy on top of this for speed.)
+    """
+
+    __tablename__ = "cache_entries"
+
+    key = db.Column(db.String(200), primary_key=True)
+    value = db.Column(db.Text, nullable=False)  # JSON string
+    fetched_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<CacheEntry {self.key} @ {self.fetched_at:%Y-%m-%d %H:%M}>"

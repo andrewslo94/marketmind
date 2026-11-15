@@ -18,6 +18,9 @@
             <form method="post" novalidate>
                 {{ form.hidden_tag() }}
                 {{ render_field(form.ticker) }}
+                {# Filled by holding_form.js after a ticker lookup. Hidden until then. #}
+                <div id="quoteBox" class="mm-quote-box d-none" aria-live="polite"
+                     data-quote-url="{{ url_for('portfolio.quote_lookup', ticker='__T__') }}"></div>
                 <div class="row">
                     <div class="col-sm-6">{{ render_field(form.shares) }}</div>
                     <div class="col-sm-6">{{ render_field(form.avg_price) }}</div>
@@ -32,4 +35,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/holding_form.js') }}"></script>
 {% endblock %}
