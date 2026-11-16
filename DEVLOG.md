@@ -145,3 +145,25 @@ Phase 1 complete.
 - yfinance logs an `HTTP Error 404` line for unknown symbols. That's the provider saying "not found", not an app error.
 
 **Addendum (same day) — price auto-fill on the holding form.** Logan asked that entering a valid ticker fill in its current price. Added `GET /portfolio/quote/<ticker>` (login-required, returns JSON via the cache: name, price, currency, Yahoo quote time, market state, stale flag, source, `delayed: true`), a `{% block scripts %}` hook in `base.html`, `static/js/holding_form.js` (looks up the ticker on blur/Enter with `fetch()`, shows a labeled "Delayed data" quote box, fills the price box only if it is empty or still holds our previous auto-fill, and tells the user to change it to what they actually paid), and quote-box styles. Tested: 200/404/400/302 responses and the rendered form markup. Design note: the auto-filled value is today's delayed price, not the purchase price, and the box says so.
+
+---
+
+## 2026-11-15 — Phase 3C: Live dashboard numbers + allocation chart
+
+**Before starting:** Logan committed 3B (8fd709f) and said "Start 3C".
+
+**What we built**
+- `app/services/portfolio_calc.py`: `build_portfolio(holdings)` → `PortfolioSummary` with one `HoldingRow` per holding (value, unrealized gain $ and %, today's change $ and %, allocation %, quote time, fetch time, stale flag) and portfolio totals. Totals include only holdings that have a quote **and** are priced in USD; others are listed in `unpriced` / `non_usd` with a note on the row, so dollars are never added to other currencies and missing data is never hidden. Rows sorted largest value first. `allocation_chart_data()` returns plain lists for the chart.
+- `app/routes/portfolio.py`: dashboard route now calls the service; new Jinja filters `signed_money`, `pct`, `big_number`, `et_time` (UTC → Eastern, since that's market time).
+- `app/templates/portfolio/dashboard.html` (replaced): provenance banner (Delayed-data badge, source, latest quote time + market state, provider refresh time, 15-minute cache note, warnings for stale/unpriced/non-USD), four KPI tiles, holdings table with per-row quote timestamp, and the allocation chart card. Gains/losses use color **plus** a ▲/▼ sign so they're not color-alone.
+- `app/static/js/dashboard_chart.js`: ranked horizontal bars, largest first, one hue (`#3987e5`), percentage printed at each bar end, hover shows the dollar value. Data arrives as JSON in a `<script type="application/json">` tag.
+- Plotly is loaded as **plotly.js 3.0.1 from cdn.plot.ly** only on the dashboard. No Python `plotly` package needed: the figure is a JSON description that we build ourselves, which also shows what the Python wrapper would generate.
+- `style.css`: gain/loss colors, provenance note, delayed badge.
+
+**Decisions**
+- Ranked bars instead of a donut for allocation: bars on one baseline make close values (23.7% vs 22.7%) readable; a donut does not.
+- Per-row timestamps as well as a portfolio-level "latest/oldest refresh", because cached quotes for different tickers can be fetched at different times.
+
+**Testing (in-memory DB, live quotes)**
+- Portfolio of AAPL, MSFT, SPY (USD), SHOP.TO (CAD), ZZZZQ (unknown, inserted directly to simulate a delisted symbol). Totals, overall %, today's change, and allocations (sum = 100%) all equal hand-computed values from the same quotes. SHOP.TO priced but excluded from totals with a note; ZZZZQ shows "Data unavailable" and sorts last. Dashboard renders the banner, warnings, KPI values, chart JSON, and Plotly script; empty state still renders for a user with no holdings.
+- Not yet verified visually in a browser (no browser automation here): Logan to check the chart layout.

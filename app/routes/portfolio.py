@@ -6,13 +6,17 @@ by current_user.id, so a user can only ever see or change their own rows.
 Phase 3A stores positions only; live prices and gain/loss arrive in 3B via
 a market-data service (routes never call external APIs directly).
 """
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.forms import HoldingForm
 from app.models import Holding
-from app.services.market_data import get_quote, normalize_ticker
+from app.services.market_data import SOURCE, get_quote, normalize_ticker
+from app.services.portfolio_calc import allocation_chart_data, build_portfolio
 
 portfolio_bp = Blueprint("portfolio", __name__, url_prefix="/portfolio")
 
@@ -35,6 +39,46 @@ def shares_fmt(value) -> str:
         return "—"
     text = f"{value:,.4f}".rstrip("0").rstrip(".")
     return text or "0"
+
+
+@portfolio_bp.app_template_filter("signed_money")
+def signed_money(value) -> str:
+    """-12.5 -> '-$12.50', 3 -> '+$3.00' (sign always shown for changes)."""
+    if value is None:
+        return "—"
+    sign = "+" if value >= 0 else "-"
+    return f"{sign}${abs(value):,.2f}"
+
+
+@portfolio_bp.app_template_filter("pct")
+def pct(value, signed=True) -> str:
+    """1.234 -> '+1.23%'; None -> '—'."""
+    if value is None:
+        return "—"
+    return f"{value:+.2f}%" if signed else f"{value:.2f}%"
+
+
+@portfolio_bp.app_template_filter("big_number")
+def big_number(value) -> str:
+    """5177380000000 -> '$5.18T' for market caps and volumes."""
+    if value is None:
+        return "Data unavailable"
+    for unit, size in (("T", 1e12), ("B", 1e9), ("M", 1e6), ("K", 1e3)):
+        if abs(value) >= size:
+            return f"{value / size:,.2f}{unit}"
+    return f"{value:,.0f}"
+
+
+ET = ZoneInfo("America/New_York")
+
+
+@portfolio_bp.app_template_filter("et_time")
+def et_time(value: datetime) -> str:
+    """UTC datetime -> 'Nov 13, 4:00 PM ET' (US market time)."""
+    if value is None:
+        return "time unavailable"
+    local = value.astimezone(ET)
+    return local.strftime("%b %d, %-I:%M %p ET")
 
 
 # ---------- Helpers ----------
@@ -69,11 +113,14 @@ def dashboard():
         .order_by(Holding.ticker)
         .all()
     )
-    total_invested = sum(h.cost_basis for h in holdings)
+    # The calculation service combines holdings with cached quotes; the
+    # route only passes the results to the template.
+    summary = build_portfolio(holdings)
     return render_template(
         "portfolio/dashboard.html",
-        holdings=holdings,
-        total_invested=total_invested,
+        summary=summary,
+        chart=allocation_chart_data(summary),
+        source=SOURCE,
     )
 
 

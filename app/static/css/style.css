@@ -173,6 +173,31 @@ body {
 .mm-quote-price { font-weight: 700; font-size: 1rem; }
 .mm-quote-meta  { color: var(--mm-muted); font-size: 0.75rem; }
 
+/* ---- Dashboard: gains/losses, provenance note ---- */
+.mm-gain { color: var(--mm-accent); }
+.mm-loss { color: var(--mm-negative); }
+.mm-warn-text { color: #f59e0b; }
+.mm-data-note {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.6rem;
+    align-items: center;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--mm-border);
+    border-radius: 8px;
+    background: var(--mm-surface);
+    font-size: 0.8rem;
+    color: var(--mm-muted);
+}
+.mm-data-note.is-warn { border-color: #f59e0b; }
+.mm-badge-delayed {
+    background: transparent;
+    border: 1px solid var(--mm-info);
+    color: var(--mm-info);
+    font-weight: 600;
+}
+.mm-table td .small { font-size: 0.75rem; }
+
 /* ---- Footer ---- */
 .mm-footer {
     background: var(--mm-surface);

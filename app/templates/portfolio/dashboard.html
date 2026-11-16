@@ -2,7 +2,8 @@
 {% block title %}Portfolio{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+{% set s = summary %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
     <div>
         <p class="mm-eyebrow mb-1">Section A</p>
         <h1 class="h3 mb-0">Your portfolio</h1>
@@ -10,92 +11,171 @@
     <a class="btn btn-success" href="{{ url_for('portfolio.add_holding') }}">+ Add holding</a>
 </div>
 
-{# ---- Summary cards. Only numbers we actually have: live value, P/L and
-      daily change need market prices, which arrive in Phase 3B. ---- #}
+{% if s.holding_count %}
+{# ---- Data provenance banner: where the prices came from and when. ---- #}
+<div class="mm-data-note mb-4 {% if s.any_stale %}is-warn{% endif %}">
+    <span class="badge mm-badge-delayed">Delayed data</span>
+    <span>Source: {{ source }}.</span>
+    {% if s.latest_market_time %}
+        <span>Latest quote time {{ s.latest_market_time|et_time }}
+            ({{ "market open" if s.market_state == "REGULAR" else "market " ~ (s.market_state or "status unknown")|lower }}).</span>
+    {% endif %}
+    {% if s.latest_fetch %}
+        <span>Refreshed from provider {{ s.latest_fetch|et_time }}{% if s.oldest_fetch and s.oldest_fetch != s.latest_fetch %} (oldest {{ s.oldest_fetch|et_time }}){% endif %}; quotes are cached for 15 minutes.</span>
+    {% endif %}
+    {% if s.any_stale %}
+        <span><strong>Provider unreachable:</strong> showing the last cached prices.</span>
+    {% endif %}
+    {% if s.unpriced %}
+        <span><strong>No price for {{ s.unpriced|join(", ") }}</strong>; excluded from totals.</span>
+    {% endif %}
+    {% if s.non_usd %}
+        <span><strong>{{ s.non_usd|join(", ") }}</strong> priced in another currency; excluded from USD totals.</span>
+    {% endif %}
+</div>
+
+{# ---- KPI row ---- #}
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-lg-3">
         <div class="mm-card mm-stat">
-            <div class="mm-stat-label">Holdings</div>
-            <div class="mm-stat-value">{{ holdings|length }}</div>
+            <div class="mm-stat-label">Current value</div>
+            <div class="mm-stat-value">{{ s.total_value|money if s.priced_count else "Data unavailable" }}</div>
+            <div class="mm-stat-note">{{ s.priced_count }} of {{ s.holding_count }} holdings priced · USD</div>
         </div>
     </div>
     <div class="col-sm-6 col-lg-3">
         <div class="mm-card mm-stat">
-            <div class="mm-stat-label">Total invested (cost basis)</div>
-            <div class="mm-stat-value">{{ total_invested|money }}</div>
+            <div class="mm-stat-label">Total invested</div>
+            <div class="mm-stat-value">{{ s.total_cost|money }}</div>
+            <div class="mm-stat-note">Cost basis of priced USD holdings</div>
         </div>
     </div>
     <div class="col-sm-6 col-lg-3">
-        <div class="mm-card mm-stat mm-stat-pending">
-            <div class="mm-stat-label">Current value</div>
-            <div class="mm-stat-value mm-muted">—</div>
-            <div class="mm-stat-note">Needs live prices · Phase 3B</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="mm-card mm-stat mm-stat-pending">
+        <div class="mm-card mm-stat">
             <div class="mm-stat-label">Unrealized P/L</div>
+            {% if s.priced_count %}
+            <div class="mm-stat-value {{ 'mm-gain' if s.total_gain >= 0 else 'mm-loss' }}">
+                {{ "▲" if s.total_gain >= 0 else "▼" }} {{ s.total_gain|signed_money }}
+            </div>
+            <div class="mm-stat-note">{{ s.total_gain_pct|pct }} overall return</div>
+            {% else %}
             <div class="mm-stat-value mm-muted">—</div>
-            <div class="mm-stat-note">Needs live prices · Phase 3B</div>
+            <div class="mm-stat-note">Data unavailable</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="mm-card mm-stat">
+            <div class="mm-stat-label">Today's change</div>
+            {% if s.priced_count %}
+            <div class="mm-stat-value {{ 'mm-gain' if s.day_change >= 0 else 'mm-loss' }}">
+                {{ "▲" if s.day_change >= 0 else "▼" }} {{ s.day_change|signed_money }}
+            </div>
+            <div class="mm-stat-note">{{ s.day_pct|pct }} vs previous close</div>
+            {% else %}
+            <div class="mm-stat-value mm-muted">—</div>
+            <div class="mm-stat-note">Data unavailable</div>
+            {% endif %}
         </div>
     </div>
 </div>
 
-{% if holdings %}
-<div class="mm-card p-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 mm-table">
-            <thead>
-                <tr>
-                    <th>Ticker</th>
-                    <th class="text-end">Shares</th>
-                    <th class="text-end">Avg. price</th>
-                    <th class="text-end">Cost basis</th>
-                    <th>Purchased</th>
-                    <th>Notes</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for h in holdings %}
-                <tr>
-                    <td><span class="mm-ticker">{{ h.ticker }}</span></td>
-                    <td class="text-end">{{ h.shares|shares }}</td>
-                    <td class="text-end">{{ h.avg_price|money }}</td>
-                    <td class="text-end fw-semibold">{{ h.cost_basis|money }}</td>
-                    <td class="mm-muted">
-                        {{ h.purchase_date.strftime("%b %d, %Y") if h.purchase_date else "—" }}
-                    </td>
-                    <td class="mm-muted small">{{ h.notes or "" }}</td>
-                    <td class="text-end text-nowrap">
-                        <a class="btn btn-outline-secondary btn-sm"
-                           href="{{ url_for('portfolio.edit_holding', holding_id=h.id) }}">Edit</a>
-                        {# Delete is a POST form; the confirm() dialog is a
-                           simple browser prompt to prevent accidental clicks. #}
-                        <form method="post" class="d-inline"
-                              action="{{ url_for('portfolio.delete_holding', holding_id=h.id) }}"
-                              onsubmit="return confirm('Remove {{ h.ticker }} from your portfolio?');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="row g-4">
+    {# ---- Holdings table ---- #}
+    <div class="col-lg-8">
+        <div class="mm-card p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 mm-table">
+                    <thead>
+                        <tr>
+                            <th>Holding</th>
+                            <th class="text-end">Shares</th>
+                            <th class="text-end">Avg. cost</th>
+                            <th class="text-end">Price</th>
+                            <th class="text-end">Today</th>
+                            <th class="text-end">Value</th>
+                            <th class="text-end">Unrealized P/L</th>
+                            <th class="text-end">Alloc.</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in s.rows %}
+                        <tr>
+                            <td>
+                                <span class="mm-ticker">{{ r.ticker }}</span>
+                                <div class="mm-muted small">{{ r.name or "" }}</div>
+                                {% if r.note %}<div class="small mm-warn-text">{{ r.note }}</div>{% endif %}
+                            </td>
+                            <td class="text-end">{{ r.shares|shares }}</td>
+                            <td class="text-end">{{ r.avg_price|money }}</td>
+                            {% if r.priced %}
+                            <td class="text-end">
+                                {{ r.price|money }}
+                                <div class="mm-muted small" title="Quote time (delayed)">{{ r.market_time|et_time }}{% if r.stale %} · stale{% endif %}</div>
+                            </td>
+                            <td class="text-end {{ 'mm-gain' if (r.day_pct or 0) >= 0 else 'mm-loss' }}">
+                                {{ r.day_pct|pct }}
+                                <div class="small">{{ r.day_change|signed_money }}</div>
+                            </td>
+                            <td class="text-end fw-semibold">{{ r.value|money }}</td>
+                            <td class="text-end {{ 'mm-gain' if r.gain >= 0 else 'mm-loss' }}">
+                                {{ r.gain|signed_money }}
+                                <div class="small">{{ r.gain_pct|pct }}</div>
+                            </td>
+                            <td class="text-end">{{ r.allocation_pct|pct(signed=False) if r.allocation_pct is not none else "—" }}</td>
+                            {% else %}
+                            <td class="text-end mm-muted" colspan="5">Data unavailable</td>
+                            {% endif %}
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-outline-secondary btn-sm"
+                                   href="{{ url_for('portfolio.edit_holding', holding_id=r.id) }}">Edit</a>
+                                <form method="post" class="d-inline"
+                                      action="{{ url_for('portfolio.delete_holding', holding_id=r.id) }}"
+                                      onsubmit="return confirm('Remove {{ r.ticker }} from your portfolio?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="small mm-muted mt-3 mb-0">
+            Value = shares × delayed price. Unrealized P/L = value − cost basis (shares × your average cost).
+            Today = change versus the previous close. Figures are for research and education only.
+        </p>
+    </div>
+
+    {# ---- Allocation chart: ranked bars, largest first, one hue ---- #}
+    <div class="col-lg-4">
+        <div class="mm-card h-100">
+            <h2 class="h6 fw-semibold mb-1">Allocation by holding</h2>
+            <p class="mm-muted small mb-2">Share of current value (USD holdings with a price).</p>
+            {% if chart.tickers %}
+            <div id="allocationChart" aria-label="Allocation by holding, ranked bar chart"></div>
+            <script type="application/json" id="allocationData">{{ chart|tojson }}</script>
+            {% else %}
+            <p class="mm-muted small mb-0">Data unavailable — no priced holdings yet.</p>
+            {% endif %}
+        </div>
     </div>
 </div>
-<p class="small mm-muted mt-3 mb-0">
-    Cost basis = shares × average purchase price, calculated from the values you entered.
-    Market prices, gains/losses, and allocation charts are added in Phase 3B.
-</p>
+
 {% else %}
 <div class="mm-card text-center py-5">
     <h2 class="h5 mb-2">No holdings yet</h2>
-    <p class="mm-muted mb-4">
-        Add the stocks you own to start tracking your portfolio.
-    </p>
+    <p class="mm-muted mb-4">Add the stocks you own to start tracking your portfolio.</p>
     <a class="btn btn-success" href="{{ url_for('portfolio.add_holding') }}">Add your first holding</a>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if summary.holding_count and chart.tickers %}
+<script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
+<script src="{{ url_for('static', filename='js/dashboard_chart.js') }}"></script>
 {% endif %}
 {% endblock %}
