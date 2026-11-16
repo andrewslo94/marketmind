@@ -33,3 +33,7 @@ class Config:
 
     # Turns off a legacy change-tracking feature that uses extra memory.
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # --- External API keys (each loaded from .env; None if not set) ---
+    # Finnhub: company + market news. Free tier, personal use, 60 calls/min.
+    FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")

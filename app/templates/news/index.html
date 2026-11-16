@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}News{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+    <div>
+        <p class="mm-eyebrow mb-1">Section B</p>
+        <h1 class="h3 mb-0">News on your holdings</h1>
+    </div>
+    {% if tickers %}
+    {# Quick ticker filter (full filter bar arrives in 4D) #}
+    <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Filter by ticker">
+        <a class="btn btn-outline-secondary {% if not selected %}active{% endif %}" href="{{ url_for('news.index') }}">All</a>
+        {% for t in tickers %}
+        <a class="btn btn-outline-secondary {% if selected == t %}active{% endif %}" href="{{ url_for('news.index', ticker=t) }}">{{ t }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+{% if not tickers %}
+<div class="mm-card text-center py-5">
+    <h2 class="h5 mb-2">No holdings yet</h2>
+    <p class="mm-muted mb-4">News is collected for the stocks in your portfolio. Add a holding to start.</p>
+    <a class="btn btn-success" href="{{ url_for('portfolio.add_holding') }}">Add a holding</a>
+</div>
+{% else %}
+
+{# ---- Provenance banner ---- #}
+<div class="mm-data-note mb-4 {% if meta.stale or meta.failed %}is-warn{% endif %}">
+    <span class="badge mm-badge-delayed">Verified facts</span>
+    <span>Headlines, publishers, times, and summaries are shown exactly as reported by {{ source }}; last {{ days }} days.</span>
+    {% if meta.fetched_at %}
+    <span>Fetched {{ meta.fetched_at|et_time }}{% if meta.oldest_fetch and meta.oldest_fetch != meta.fetched_at %} (oldest {{ meta.oldest_fetch|et_time }}){% endif %}; cached 30 minutes.</span>
+    {% endif %}
+    <span>{{ source }} tags stories by ticker, so an article may only mention your company.</span>
+    {% if meta.stale %}<span><strong>Provider unreachable:</strong> showing cached articles.</span>{% endif %}
+    {% for t, why in meta.failed.items() %}
+    <span><strong>{{ t }}:</strong> Data unavailable ({{ why }}).</span>
+    {% endfor %}
+</div>
+
+{% if articles %}
+<p class="mm-muted small mb-2">{{ articles|length }} article{{ "s" if articles|length != 1 }}{% if selected %} tagged {{ selected }}{% endif %}, newest first.</p>
+<div class="mm-card">
+    {% for a in articles %}
+    <article class="mm-article">
+        {% if a.image %}
+        <img class="mm-article-thumb d-none d-sm-block" src="{{ a.image }}" alt="" loading="lazy"
+             onerror="this.style.display='none'">
+        {% endif %}
+        <div class="flex-grow-1">
+            <div class="mb-1">
+                {% for t in a.tickers %}
+                <a class="badge mm-badge-ticker" href="{{ url_for('stocks.detail', ticker=t) }}">{{ t }}</a>
+                {% endfor %}
+            </div>
+            <a class="mm-article-title" href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.headline }}</a>
+            <div class="mm-article-meta mt-1">
+                {{ a.publisher }} · {{ a.published_at|fromiso|et_time if a.published_at else "time unavailable" }}
+                · <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">Read article ↗</a>
+            </div>
+            {% if a.summary %}
+            <p class="small mb-0 mt-2">
+                <span class="mm-fact-label">Provider summary</span>{{ a.summary }}
+            </p>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% elif not meta.failed %}
+<div class="mm-card text-center py-5">
+    <h2 class="h6 mb-1">No articles in the last {{ days }} days</h2>
+    <p class="mm-muted small mb-0">{{ source }} returned nothing for {{ selected or tickers|join(", ") }}.</p>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

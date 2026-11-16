@@ -207,6 +207,23 @@ body {
 .mm-stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .mm-range-group .btn.active { background: var(--mm-border); color: var(--mm-text); border-color: var(--mm-border); }
 
+/* ---- News ---- */
+.mm-article { display: flex; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--mm-border); }
+.mm-article:last-child { border-bottom: 0; }
+.mm-article-thumb { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--mm-border); }
+.mm-article-title { font-weight: 600; color: var(--mm-text); text-decoration: none; }
+.mm-article-title:hover { color: var(--mm-accent); }
+.mm-article-meta { font-size: 0.8rem; color: var(--mm-muted); }
+.mm-fact-label {
+    display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--mm-muted); margin-right: 0.35rem;
+}
+.mm-badge-ticker {
+    background: transparent; border: 1px solid var(--mm-border); color: var(--mm-text);
+    font-weight: 600; text-decoration: none;
+}
+.mm-badge-ticker:hover { border-color: var(--mm-accent); color: var(--mm-accent); }
+
 /* ---- Footer ---- */
 .mm-footer {
     background: var(--mm-surface);

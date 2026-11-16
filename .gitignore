@@ -14,3 +14,6 @@ __pycache__/
 
 # --- macOS / editor clutter ---
 .DS_Store
+
+# --- VS Code editor settings (personal, not part of the app) ---
+.vscode/

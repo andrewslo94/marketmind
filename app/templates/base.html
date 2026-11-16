@@ -51,6 +51,10 @@
                         <a class="nav-link {% if request.blueprint == 'portfolio' %}active{% endif %}"
                            href="{{ url_for('portfolio.dashboard') }}">Portfolio</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.blueprint == 'news' %}active{% endif %}"
+                           href="{{ url_for('news.index') }}">News</a>
+                    </li>
                     {% endif %}
                     <!-- More links are added here as each section is built.
                          We don't show links to pages that don't exist yet. -->

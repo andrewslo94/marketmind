@@ -185,3 +185,26 @@ Phase 1 complete.
 - Not viewed in a browser here; Logan to check the chart (range buttons, hover, no overnight gaps).
 
 **Phase 3 is complete:** holdings CRUD, yfinance + cache, live dashboard, stock pages with charts.
+
+---
+
+## 2026-11-16 — Phase 4A: Finnhub company news for holdings
+
+**Before starting:** Logan created a free Finnhub account and added `FINNHUB_API_KEY` to `.env` (verified structurally without printing it; one test call returned 200 with `X-Ratelimit-Limit: 60`).
+
+**About the provider**
+- Finnhub REST API, free tier: personal/non-commercial use, 60 calls per minute (confirmed by the response headers). Key sent in the `X-Finnhub-Token` header, never in the URL, so it can't leak into logs. Company-news endpoint returns id, headline, source, unix datetime, summary, url, image, category, related.
+- Observed limitation: Finnhub's ticker tagging is loose (a Berkshire/Nvidia story was tagged AAPL). The page says so.
+
+**What we built**
+- `config.py`: `FINNHUB_API_KEY` setting (None if missing).
+- `app/services/news_service.py`: `get_company_news(ticker, days)` → cached 30 min (`news:AAPL:7d`), normalizes each article to a plain dict (ISO UTC `published_at`, provider summary kept verbatim), caps at 40 per ticker, maps 429 / 401 / network errors to `NewsError` so the cache can serve a stale copy. `get_portfolio_news(tickers)` merges per-ticker results, de-duplicates by article id (collecting every ticker an article was tagged with), sorts newest first, and returns `meta` (fetch times, stale flag, per-ticker failures).
+- `app/routes/news.py`: `news` blueprint at `/news`, login-required, holdings → tickers → articles; `?ticker=` quick filter (full filters in 4D).
+- `app/templates/news/index.html`: "Verified facts" banner (source, fetch time, 30-min cache note, tagging caveat, stale/failed warnings), article list with ticker badges linking to stock pages, headline → article link (`rel="noopener noreferrer"`), publisher + time in ET, and the provider summary labeled "Provider summary". Empty states for no holdings / no articles.
+- Hookups: blueprint registered, "News" nav link, CSS. `.vscode/` added to `.gitignore`.
+
+**Testing (in-memory DB, live Finnhub)**
+- Two holdings → 76 merged articles, none duplicated, 4 tagged with both tickers, newest first; second call from cache. Logged-out → redirect; page shows banner, summaries, links, nav link; `?ticker=AAPL` filters; unknown ticker filter ignored; user with no holdings sees the empty state. With `FINNHUB_API_KEY=None` the page still renders and shows "Data unavailable (FINNHUB_API_KEY is not set in .env)" per ticker with a warning border.
+
+**Notes**
+- Article URLs are Finnhub redirect links (`finnhub.io/api/news?id=...`) that forward to the publisher. That's how the provider delivers them.
