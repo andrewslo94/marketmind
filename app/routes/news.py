@@ -10,6 +10,7 @@ from flask_login import current_user, login_required
 
 from app.models import Holding
 from app.services.news_service import SOURCE, get_portfolio_news
+from app.services.sentiment import METHOD as SENTIMENT_METHOD, analyze_article
 
 news_bp = Blueprint("news", __name__, url_prefix="/news")
 
@@ -30,6 +31,10 @@ def index():
     articles, meta = [], {"fetched_at": None, "oldest_fetch": None, "stale": False, "failed": {}}
     if tickers:
         articles, meta = get_portfolio_news([selected] if selected else tickers, DAYS)
+        # Interpretation layer (4B): rule-based sentiment per article. Cheap
+        # (a dictionary lookup), so it runs on every request, no caching.
+        for a in articles:
+            a["sentiment"] = analyze_article(a)
 
     return render_template(
         "news/index.html",
@@ -39,4 +44,5 @@ def index():
         selected=selected,
         days=DAYS,
         source=SOURCE,
+        sentiment_method=SENTIMENT_METHOD,
     )

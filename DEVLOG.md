@@ -208,3 +208,25 @@ Phase 1 complete.
 
 **Notes**
 - Article URLs are Finnhub redirect links (`finnhub.io/api/news?id=...`) that forward to the publisher. That's how the provider delivers them.
+
+---
+
+## 2026-11-16 — Phase 4B: Rule-based sentiment with reasons
+
+**Before starting:** Logan committed 4A (e69fcdf) and approved installing vaderSentiment.
+
+**Why a finance keyword list was needed (measured, not assumed)**
+- Plain VADER on finance headlines: "Apple beats earnings estimates, raises guidance" → 0.00; "shares tumble after it misses revenue expectations" → +0.08; "Stock hits record high as demand surges" → −0.13. None of *beats, downgrade, tumble, layoffs, record* are in its 7,506-word lexicon.
+
+**What we built**
+- Installed **vaderSentiment 3.3.2** (dictionary-based, no model, no network). `requirements.txt` refreshed.
+- `app/services/sentiment.py`: `FINANCE_LEXICON` (~170 finance terms scored on VADER's −4..+4 scale: results/guidance/ratings, price action, corporate/legal/regulatory events, plus overrides for words VADER gets wrong in finance such as *sell*, *cut*, *record*, *high*). Multi-word phrases ("raises guidance", "record high", "cuts dividend") are folded into single tokens before scoring so they can live in the dictionary while VADER's negation and intensifier rules still apply. `analyze(text)` returns label (thresholds ±0.10 on the compound score), score, and the matched finance terms as the reason; `analyze_article()` scores headline + provider summary (the only article text we have).
+- `app/routes/news.py`: attaches `sentiment` to each article (cheap, uncached).
+- `app/templates/news/index.html`: dashed purple "Interpretation" block under each article (label with ▲/●/▼, score, matched terms colored by polarity, which text was used), plus a banner line stating sentiment is computed by MarketMind and not part of the reporting. `style.css`: interpretation styles.
+
+**Testing**
+- 12 hand-written headlines: all labeled as expected (e.g. beats/raises guidance → +0.78 positive; cuts dividend/losses → −0.72 negative; "to report results Thursday" → neutral). "Shares did not fall despite weak guidance" → positive via VADER's negation flip, which is debatable; added *weak guidance / soft guidance / disappointing* to the list afterward.
+- Live page with AAPL + MSFT: 76 articles labeled (43 positive / 20 negative / 13 neutral), interpretation block and banner present.
+
+**Notes**
+- The keyword list is deliberately a plain Python dict at the top of `sentiment.py` so it can be shown and edited in the demo.

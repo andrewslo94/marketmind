@@ -224,6 +224,22 @@ body {
 }
 .mm-badge-ticker:hover { border-color: var(--mm-accent); color: var(--mm-accent); }
 
+/* ---- Interpretation layer (sentiment etc.): dashed, muted, clearly separate ---- */
+.mm-badge-interp { background: transparent; border: 1px dashed #a78bfa; color: #a78bfa; font-weight: 600; }
+.mm-interp {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;
+    padding: 0.4rem 0.6rem; border: 1px dashed var(--mm-border); border-radius: 6px;
+    font-size: 0.78rem; color: var(--mm-muted);
+}
+.mm-interp-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #a78bfa; }
+.mm-badge-sent { font-weight: 600; border: 1px solid transparent; background: transparent; }
+.mm-sent-positive { color: var(--mm-accent); border-color: var(--mm-accent); }
+.mm-sent-negative { color: var(--mm-negative); border-color: var(--mm-negative); }
+.mm-sent-neutral  { color: var(--mm-muted); border-color: var(--mm-border); }
+.mm-term { font-style: italic; }
+.mm-term-positive { color: var(--mm-accent); }
+.mm-term-negative { color: var(--mm-negative); }
+
 /* ---- Footer ---- */
 .mm-footer {
     background: var(--mm-surface);
