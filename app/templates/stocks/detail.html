@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ q.ticker }} · {{ q.name }}{% endblock %}
+
+{% block content %}
+{% set up = (q.change or 0) >= 0 %}
+
+{# ---- Header: identity + headline price ---- #}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div>
+        <p class="mm-eyebrow mb-1">
+            {{ q.quote_type|lower|capitalize }} · {{ q.exchange or "Exchange unavailable" }}
+            {% if q.sector %} · {{ q.sector }}{% endif %}{% if q.industry %} · {{ q.industry }}{% endif %}
+        </p>
+        <h1 class="h3 mb-0"><span class="mm-ticker">{{ q.ticker }}</span> <span class="fw-normal">{{ q.name }}</span></h1>
+    </div>
+    <div class="text-lg-end">
+        <div class="mm-hero-price">{{ q.price|money }} <span class="mm-muted fs-6">{{ q.currency }}</span></div>
+        <div class="{{ 'mm-gain' if up else 'mm-loss' }} fw-semibold">
+            {{ "▲" if up else "▼" }} {{ q.change|signed_money }} ({{ q.change_pct|pct }}) today
+        </div>
+    </div>
+</div>
+
+{# ---- Provenance ---- #}
+<div class="mm-data-note mb-4 {% if stale %}is-warn{% endif %}">
+    <span class="badge mm-badge-delayed">Delayed data</span>
+    <span>Source: {{ source }}.</span>
+    <span>Quote time {{ q.market_time and (q.market_time|fromiso|et_time) }}
+        ({{ "market open" if q.market_state == "REGULAR" else "market " ~ (q.market_state or "status unknown")|lower }}).</span>
+    <span>Refreshed from provider {{ fetched_at|et_time }}; cached up to 15 minutes.</span>
+    {% if stale %}<span><strong>Provider unreachable:</strong> showing the last cached quote.</span>{% endif %}
+</div>
+
+<div class="row g-4">
+    {# ---- Chart ---- #}
+    <div class="col-lg-8">
+        <div class="mm-card">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <h2 class="h6 fw-semibold mb-0">Price history</h2>
+                <div class="btn-group btn-group-sm mm-range-group" role="group" aria-label="Chart range">
+                    {% for r in ranges %}
+                    <button type="button" class="btn btn-outline-secondary {% if r == '1M' %}active{% endif %}"
+                            data-range="{{ r }}">{{ r if r != "MAX" else "Max" }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div id="stockChart" data-history-url="{{ url_for('stocks.history_json', ticker=q.ticker) }}"
+                 aria-label="{{ q.ticker }} closing price line chart"></div>
+            <div id="chartSummary" class="mm-muted small mt-2">Loading chart…</div>
+        </div>
+    </div>
+
+    {# ---- Key statistics (facts from the quote) ---- #}
+    <div class="col-lg-4">
+        <div class="mm-card h-100">
+            <h2 class="h6 fw-semibold mb-3">Key statistics</h2>
+            <dl class="mm-stats mb-0">
+                <dt>Previous close</dt><dd>{{ q.previous_close|money }}</dd>
+                <dt>Open</dt><dd>{{ q.open|money }}</dd>
+                <dt>Day range</dt>
+                <dd>{% if q.day_low is not none and q.day_high is not none %}{{ q.day_low|money }} – {{ q.day_high|money }}{% else %}Data unavailable{% endif %}</dd>
+                <dt>52-week range</dt>
+                <dd>{% if q.week52_low is not none and q.week52_high is not none %}{{ q.week52_low|money }} – {{ q.week52_high|money }}{% else %}Data unavailable{% endif %}</dd>
+                <dt>Volume</dt><dd>{{ q.volume|big_number }}</dd>
+                <dt>Avg. volume</dt><dd>{{ q.avg_volume|big_number }}</dd>
+                <dt>Market cap</dt><dd>{% if q.market_cap is not none %}${{ q.market_cap|big_number }}{% else %}Data unavailable{% endif %}</dd>
+                <dt>Currency</dt><dd>{{ q.currency or "Data unavailable" }}</dd>
+            </dl>
+
+            {% if holding %}
+            <hr class="my-3">
+            <h3 class="h6 fw-semibold mb-2">Your position</h3>
+            <dl class="mm-stats mb-0">
+                <dt>Shares</dt><dd>{{ holding.shares|shares }}</dd>
+                <dt>Avg. cost</dt><dd>{{ holding.avg_price|money }}</dd>
+                <dt>Value</dt><dd>{{ (holding.shares * q.price)|money }}</dd>
+                {% set gain = holding.shares * q.price - holding.cost_basis %}
+                <dt>Unrealized P/L</dt>
+                <dd class="{{ 'mm-gain' if gain >= 0 else 'mm-loss' }}">{{ gain|signed_money }} ({{ (gain / holding.cost_basis * 100)|pct }})</dd>
+            </dl>
+            <a class="btn btn-outline-secondary btn-sm mt-3" href="{{ url_for('portfolio.edit_holding', holding_id=holding.id) }}">Edit holding</a>
+            {% else %}
+            <hr class="my-3">
+            <p class="mm-muted small mb-2">Not in your portfolio.</p>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('portfolio.add_holding') }}">Add a holding</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<p class="small mm-muted mt-4 mb-0">
+    Figures are facts reported by the data source, delayed, for research and education only.
+    MarketMind never recommends buying or selling.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
+<script src="{{ url_for('static', filename='js/stock_chart.js') }}"></script>
+{% endblock %}

@@ -167,3 +167,21 @@ Phase 1 complete.
 **Testing (in-memory DB, live quotes)**
 - Portfolio of AAPL, MSFT, SPY (USD), SHOP.TO (CAD), ZZZZQ (unknown, inserted directly to simulate a delisted symbol). Totals, overall %, today's change, and allocations (sum = 100%) all equal hand-computed values from the same quotes. SHOP.TO priced but excluded from totals with a note; ZZZZQ shows "Data unavailable" and sorts last. Dashboard renders the banner, warnings, KPI values, chart JSON, and Plotly script; empty state still renders for a user with no holdings.
 - Not yet verified visually in a browser (no browser automation here): Logan to check the chart layout.
+
+---
+
+## 2026-11-15 — Phase 3D: Stock detail pages with range-filtered price chart (Phase 3 complete)
+
+**Before starting:** Logan committed 3C (cae6aab) and said "Please do 3D".
+
+**What we built**
+- `app/routes/stocks.py`: `stocks` blueprint. `/stocks/<ticker>` renders the full delayed quote (price, change, previous close, open, day range, 52-week range, volume, average volume, market cap, currency, exchange, sector/industry) with the same provenance banner as the dashboard, plus a "Your position" panel when the user holds the stock. Unknown symbol → a 404 page; provider down with nothing cached → a 503 "Data unavailable" page. `/stocks/<ticker>/history.json?range=1M` returns chart points for one of the eight ranges, timestamps converted to US Eastern and sent without a timezone suffix (plotly.js plots date strings as given), values rounded to 4 decimals.
+- `app/templates/stocks/detail.html` and `not_found.html`.
+- `app/static/js/stock_chart.js`: one-series line chart (2px, one hue), unified hover with crosshair, y-axis padded around the data instead of starting at zero, Plotly `rangebreaks` to drop weekends and non-trading hours so intraday charts have no flat overnight segments. The range buttons fetch and redraw with `Plotly.react`. A summary line under the chart shows the period change, range, bar count, and the delayed-data/source note.
+- Hookups: blueprint registered; dashboard tickers link to detail pages; `fromiso` filter; CSS for the stats grid, hero price, and range buttons.
+
+**Testing (in-memory DB, live data)**
+- Logged-out → redirect. AAPL page shows name, quote time "Nov 13, 4:00 PM ET (market closed)", key stats including $5.18T market cap, and the position panel for a held stock; MSFT shows "Not in your portfolio". ZZZZQ → 404 page, `bad!ticker` → 404. All eight ranges return points (1D: 78 five-minute bars from 09:30 to 15:55 ET; MAX: 503 monthly bars from 1985). Bad range → 400. Unknown ticker history → empty points (chart shows "Data unavailable"). Dashboard links present.
+- Not viewed in a browser here; Logan to check the chart (range buttons, hover, no overnight gaps).
+
+**Phase 3 is complete:** holdings CRUD, yfinance + cache, live dashboard, stock pages with charts.

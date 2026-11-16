@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ ticker }}{% endblock %}
+{% block content %}
+<div class="mm-card text-center py-5">
+    {% if unavailable %}
+    <h1 class="h4 mb-2">Data unavailable</h1>
+    <p class="mm-muted mb-4">The price provider could not be reached for {{ ticker }} and nothing is cached yet. Try again in a few minutes.</p>
+    {% else %}
+    <h1 class="h4 mb-2">{{ ticker }} not found</h1>
+    <p class="mm-muted mb-4">That symbol isn't a stock or ETF the data source recognizes. Check the spelling (e.g. GOOGL, not GOOGLE).</p>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('portfolio.dashboard') }}">Back to portfolio</a>
+</div>
+{% endblock %}

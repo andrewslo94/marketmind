@@ -72,6 +72,15 @@ def big_number(value) -> str:
 ET = ZoneInfo("America/New_York")
 
 
+@portfolio_bp.app_template_filter("fromiso")
+def fromiso(text):
+    """ISO-8601 string (as stored in the cache) -> datetime, or None."""
+    try:
+        return datetime.fromisoformat(text) if text else None
+    except ValueError:
+        return None
+
+
 @portfolio_bp.app_template_filter("et_time")
 def et_time(value: datetime) -> str:
     """UTC datetime -> 'Nov 13, 4:00 PM ET' (US market time)."""

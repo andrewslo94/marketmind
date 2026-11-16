@@ -103,7 +103,7 @@
                         {% for r in s.rows %}
                         <tr>
                             <td>
-                                <span class="mm-ticker">{{ r.ticker }}</span>
+                                <a class="mm-ticker mm-ticker-link" href="{{ url_for('stocks.detail', ticker=r.ticker) }}">{{ r.ticker }}</a>
                                 <div class="mm-muted small">{{ r.name or "" }}</div>
                                 {% if r.note %}<div class="small mm-warn-text">{{ r.note }}</div>{% endif %}
                             </td>

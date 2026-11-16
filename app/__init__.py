@@ -46,9 +46,11 @@ def create_app(config_class=Config):
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
     from app.routes.portfolio import portfolio_bp
+    from app.routes.stocks import stocks_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(portfolio_bp)
+    app.register_blueprint(stocks_bp)
 
     return app

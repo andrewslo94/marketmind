@@ -198,6 +198,15 @@ body {
 }
 .mm-table td .small { font-size: 0.75rem; }
 
+/* ---- Stock detail page ---- */
+.mm-ticker-link { text-decoration: none; color: var(--mm-text); }
+.mm-ticker-link:hover { color: var(--mm-accent); text-decoration: underline; }
+.mm-hero-price { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.mm-stats { display: grid; grid-template-columns: auto 1fr; column-gap: 1rem; row-gap: 0.45rem; font-size: 0.9rem; }
+.mm-stats dt { color: var(--mm-muted); font-weight: 500; }
+.mm-stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.mm-range-group .btn.active { background: var(--mm-border); color: var(--mm-text); border-color: var(--mm-border); }
+
 /* ---- Footer ---- */
 .mm-footer {
     background: var(--mm-surface);
