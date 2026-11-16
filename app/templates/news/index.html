@@ -35,7 +35,7 @@
     {% endif %}
     <span>{{ source }} tags stories by ticker, so an article may only mention your company.</span>
     <span class="badge mm-badge-interp">Interpretation</span>
-    <span>Sentiment labels are computed by MarketMind ({{ sentiment_method }}) and are not part of the reporting.</span>
+    <span>Sentiment, auto-summaries, and implications are computed by MarketMind and are not part of the reporting. Sentiment: {{ sentiment_method }}. Summary: {{ summary_method }}. Implications: {{ implications_method }}.</span>
     {% if meta.stale %}<span><strong>Provider unreachable:</strong> showing cached articles.</span>{% endif %}
     {% for t, why in meta.failed.items() %}
     <span><strong>{{ t }}:</strong> Data unavailable ({{ why }}).</span>
@@ -68,6 +68,16 @@
             </p>
             {% endif %}
 
+            {# ---- Auto-summary: sentences copied from the provider text (4C) ---- #}
+            {% set sm = a.summary_auto %}
+            {% if sm.summary and not sm.is_full_text %}
+            <p class="small mb-0 mt-2 mm-auto-summary">
+                <span class="mm-interp-label">Auto-summary</span>
+                {{ sm.summary }}
+                <span class="mm-muted">({{ sm.sentences|selectattr("selected")|list|length }} of {{ sm.sentence_count }} sentences selected; no generated wording)</span>
+            </p>
+            {% endif %}
+
             {# ---- Interpretation: visually separated from the facts above ---- #}
             {% set sent = a.sentiment %}
             <div class="mm-interp mt-2">
@@ -87,6 +97,25 @@
                     {% endif %}
                     · on {{ sent.text_used }}
                 </span>
+            </div>
+
+            {# ---- Potential implications: rule-based, generic (4C) ---- #}
+            <div class="mm-interp mm-implications mt-1">
+                <span class="mm-interp-label">Potential implications</span>
+                {% if a.implications %}
+                <ul class="mm-impl-list">
+                    {% for imp in a.implications[:3] %}
+                    <li>
+                        <span class="mm-impl-topic mm-impl-{{ imp.direction }}">{{ imp.topic }}</span>
+                        <span class="mm-muted">(matched: {{ imp.matched|join(", ") }})</span>
+                        — {{ imp.implication }}
+                        <span class="mm-muted">Watch: {{ imp.watch }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <span class="mm-interp-why">No rule matched this article's text, so no implication is shown.</span>
+                {% endif %}
             </div>
         </div>
     </article>

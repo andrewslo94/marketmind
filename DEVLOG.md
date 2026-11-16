@@ -230,3 +230,23 @@ Phase 1 complete.
 
 **Notes**
 - The keyword list is deliberately a plain Python dict at the top of `sentiment.py` so it can be shown and edited in the demo.
+
+---
+
+## 2026-11-16 — Phase 4C: Extractive summaries + rule-based implications
+
+**Before starting:** Logan committed 4B (cf63cf7) and said "start phase 4c". No install needed.
+
+**What we built**
+- `app/services/summarizer.py`: **extractive** summaries. Sentences are split (abbreviations like *Inc.*, *U.S.* protected), scored with explainable rules (+1 first sentence, +2 names the company, +1.5 contains a figure, +0.5 per finance keyword up to +2, −1 too short/long, boilerplate such as "sign up"/"read more" excluded), and the top two are shown in original order. Nothing is paraphrased or generated. If the source text has ≤ 2 usable sentences, `is_full_text=True` and the page shows no auto-summary (the provider summary already is the whole text). Every sentence's score and reasons are returned for transparency.
+- `app/services/implications.py`: 16 keyword rules (results beat/miss, guidance raised/cut, analyst upgrade/downgrade, M&A, product launch/approval, legal/regulatory, layoffs, dividend/buyback, security incident/outage, leadership change, tariffs/trade, rates/inflation, AI/technology investment). Each fires only when its keywords appear (whole-word matching; " ai " guarded so "airline" doesn't match), and reports the matched keywords, a generic implication, and "what to watch". No rule → "No rule matched" shown, nothing invented. Wording deliberately avoids buy/sell language.
+- `app/routes/news.py`: attaches `summary_auto` and `implications` per article; passes company names from cached quotes to the summarizer.
+- `app/templates/news/index.html`: "Auto-summary" paragraph (dashed purple left border, "n of m sentences selected; no generated wording") and a "Potential implications" block (topic colored by direction, matched keywords, implication, watch item; up to 3). Banner now states the methods for sentiment, summary, and implications. `style.css` additions.
+
+**Testing**
+- Splitter: 3 sentences from text containing "Inc." and "U.S.". Summarizer on a 5-sentence sample: picked the lead sentence (5.5 points: first, names company, figure, finance terms) and the buyback sentence; excluded the newsletter boilerplate and the low-value "based in Redmond" sentence. Short text flagged as full text.
+- Implications: beat + raised guidance + buyback + upgrade all detected with their keywords; plain text matches nothing; "airline" doesn't trigger the AI rule; no buy/sell words in any rule text.
+- Live page (AAPL + MSFT, 76 articles): 17 auto-summaries (the rest were ≤ 2 sentences), 39 articles with implications, 37 "No rule matched". Most common topic: AI/technology investment.
+
+**Decisions**
+- Implications are generic by design (same wording per topic). Making them company-specific would require inventing analysis, which the rules forbid; the sector-level analysis comes in Phase 5 with the topic → sector map.

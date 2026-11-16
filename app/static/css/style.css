@@ -240,6 +240,16 @@ body {
 .mm-term-positive { color: var(--mm-accent); }
 .mm-term-negative { color: var(--mm-negative); }
 
+/* ---- Auto-summary & implications (interpretation layer, 4C) ---- */
+.mm-auto-summary { border-left: 2px dashed #a78bfa; padding-left: 0.6rem; }
+.mm-implications { display: block; }
+.mm-impl-list { margin: 0.25rem 0 0; padding-left: 1.1rem; }
+.mm-impl-list li { margin-bottom: 0.25rem; color: var(--mm-text); }
+.mm-impl-topic { font-weight: 600; }
+.mm-impl-positive { color: var(--mm-accent); }
+.mm-impl-negative { color: var(--mm-negative); }
+.mm-impl-mixed { color: #f59e0b; }
+
 /* ---- Footer ---- */
 .mm-footer {
     background: var(--mm-surface);
