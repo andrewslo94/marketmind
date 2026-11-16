@@ -250,3 +250,22 @@ Phase 1 complete.
 
 **Decisions**
 - Implications are generic by design (same wording per topic). Making them company-specific would require inventing analysis, which the rules forbid; the sector-level analysis comes in Phase 5 with the topic → sector map.
+
+---
+
+## 2026-11-16 — Phase 4D: News filters (Phase 4 complete)
+
+**Before starting:** Logan committed 4C (f600bf4) and said "Please start 4D". No install.
+
+**What we built**
+- `app/services/news_service.py`: `parse_filters(args, tickers)` turns the URL's query parameters into a clean dict (unknown ticker, bad date, or bogus sentiment value → that filter is simply off, so a hand-edited URL can't break the page); `filter_articles(articles, filters, names)` keeps articles that satisfy every active filter: ticker, company/keyword text (searched across headline, provider summary, publisher, tickers, and the company names from cached quotes, so "Apple" finds AAPL stories), date range (publication date in US Eastern), category, sentiment (MarketMind's label); `active_filter_count`. Filtering runs on the already-fetched list, so it never costs a provider call.
+- `app/routes/news.py`: always fetches all holdings' news (each ticker is cached), analyzes, then filters; passes `total`, `categories` (from the data), `names`, `filters`, `active_filters`.
+- `app/templates/news/index.html`: GET filter form (ticker select with company names, text search, from/to dates, category, sentiment, Apply, ✕ clear) replaces the quick ticker buttons; "Showing X of Y articles (N filters active)" line; "No articles match these filters" state with a Clear button. `style.css`: filter bar + dark `form-select`.
+
+**Why a GET form:** the filters live in the URL, so a filtered view can be bookmarked or shared and the back button works. That's the conventional choice for search/filter pages.
+
+**Testing**
+- Unit tests on synthetic articles: each filter alone, invalid params ignored, company-name search via the names map, keyword search in summary, date_from excludes undated articles, combined filters with the correct active count.
+- Live page (AAPL + MSFT): 76 of 76 with no filters; ticker=AAPL → 40; sentiment=negative → 20 and every badge on the page is negative; three combined filters → 25 with "3 filters active"; nonsense keyword → 0 with the no-match state; garbage parameters → 200 with no filters active.
+
+**Phase 4 is complete:** company news → sentiment with reasons → extractive summaries + implications → filters.

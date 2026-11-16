@@ -7,15 +7,6 @@
         <p class="mm-eyebrow mb-1">Section B</p>
         <h1 class="h3 mb-0">News on your holdings</h1>
     </div>
-    {% if tickers %}
-    {# Quick ticker filter (full filter bar arrives in 4D) #}
-    <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Filter by ticker">
-        <a class="btn btn-outline-secondary {% if not selected %}active{% endif %}" href="{{ url_for('news.index') }}">All</a>
-        {% for t in tickers %}
-        <a class="btn btn-outline-secondary {% if selected == t %}active{% endif %}" href="{{ url_for('news.index', ticker=t) }}">{{ t }}</a>
-        {% endfor %}
-    </div>
-    {% endif %}
 </div>
 
 {% if not tickers %}
@@ -42,8 +33,66 @@
     {% endfor %}
 </div>
 
+{# ---- Filter bar (GET form: the URL carries the filters) ---- #}
+<form method="get" class="mm-card mm-filter-bar mb-3" role="search" aria-label="Filter news">
+    <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="f-ticker">Ticker</label>
+            <select class="form-select form-select-sm" id="f-ticker" name="ticker">
+                <option value="">All</option>
+                {% for t in tickers %}
+                <option value="{{ t }}" {% if filters.ticker == t %}selected{% endif %}>{{ t }}{% if names.get(t) %} · {{ names[t] }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="f-q">Company or keyword</label>
+            <input class="form-control form-control-sm" id="f-q" name="q" type="search" maxlength="80"
+                   value="{{ filters.q }}" placeholder="e.g. Apple, earnings, lawsuit">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="f-from">From</label>
+            <input class="form-control form-control-sm" id="f-from" name="date_from" type="date"
+                   value="{{ filters.date_from.isoformat() if filters.date_from else '' }}">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="f-to">To</label>
+            <input class="form-control form-control-sm" id="f-to" name="date_to" type="date"
+                   value="{{ filters.date_to.isoformat() if filters.date_to else '' }}">
+        </div>
+        <div class="col-6 col-md-1">
+            <label class="form-label" for="f-cat">Category</label>
+            <select class="form-select form-select-sm" id="f-cat" name="category">
+                <option value="">All</option>
+                {% for c in categories %}
+                <option value="{{ c }}" {% if filters.category == c %}selected{% endif %}>{{ c|capitalize }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-1">
+            <label class="form-label" for="f-sent">Sentiment</label>
+            <select class="form-select form-select-sm" id="f-sent" name="sentiment">
+                <option value="">All</option>
+                {% for sname in ["positive", "neutral", "negative"] %}
+                <option value="{{ sname }}" {% if filters.sentiment == sname %}selected{% endif %}>{{ sname|capitalize }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-1 d-flex gap-1">
+            <button type="submit" class="btn btn-success btn-sm flex-grow-1">Apply</button>
+            {% if active_filters %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('news.index') }}" title="Clear filters">✕</a>
+            {% endif %}
+        </div>
+    </div>
+</form>
+
+<p class="mm-muted small mb-2">
+    Showing {{ articles|length }} of {{ total }} article{{ "s" if total != 1 }}{% if active_filters %} ({{ active_filters }} filter{{ "s" if active_filters != 1 }} active){% endif %}, newest first.
+    <span class="mm-muted">Sentiment filter uses MarketMind's interpretation, not the publisher's.</span>
+</p>
+
 {% if articles %}
-<p class="mm-muted small mb-2">{{ articles|length }} article{{ "s" if articles|length != 1 }}{% if selected %} tagged {{ selected }}{% endif %}, newest first.</p>
 <div class="mm-card">
     {% for a in articles %}
     <article class="mm-article">
@@ -121,10 +170,16 @@
     </article>
     {% endfor %}
 </div>
+{% elif active_filters %}
+<div class="mm-card text-center py-5">
+    <h2 class="h6 mb-1">No articles match these filters</h2>
+    <p class="mm-muted small mb-3">{{ total }} article{{ "s" if total != 1 }} available in the last {{ days }} days.</p>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('news.index') }}">Clear filters</a>
+</div>
 {% elif not meta.failed %}
 <div class="mm-card text-center py-5">
     <h2 class="h6 mb-1">No articles in the last {{ days }} days</h2>
-    <p class="mm-muted small mb-0">{{ source }} returned nothing for {{ selected or tickers|join(", ") }}.</p>
+    <p class="mm-muted small mb-0">{{ source }} returned nothing for {{ tickers|join(", ") }}.</p>
 </div>
 {% endif %}
 {% endif %}

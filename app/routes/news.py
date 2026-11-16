@@ -1,15 +1,23 @@
 """
 app/routes/news.py — Section B: news about the stocks the user holds.
 
-Phase 4A shows the facts only: headline, publisher, time, ticker(s), link,
-and the provider's own short summary. Sentiment, extractive summaries, and
-implications are added in 4B/4C and will be labeled as interpretation.
+Facts (headline, publisher, time, ticker, link, provider summary) come from
+Finnhub via news_service. The interpretation layer (sentiment, extractive
+summary, implications) is computed per article and labeled as such. Filters
+(4D) are plain GET parameters applied to the fetched list, so the URL is
+shareable and the back button works.
 """
 from flask import Blueprint, render_template, request
 from flask_login import current_user, login_required
 
 from app.models import Holding
-from app.services.news_service import SOURCE, get_portfolio_news
+from app.services.news_service import (
+    SOURCE,
+    active_filter_count,
+    filter_articles,
+    get_portfolio_news,
+    parse_filters,
+)
 from app.services.implications import METHOD as IMPLICATIONS_METHOD, implications_for_article
 from app.services.market_data import get_quotes
 from app.services.sentiment import METHOD as SENTIMENT_METHOD, analyze_article
@@ -26,31 +34,37 @@ def index():
     holdings = Holding.query.filter_by(user_id=current_user.id).order_by(Holding.ticker).all()
     tickers = [h.ticker for h in holdings]
 
-    # Optional ?ticker=AAPL narrows the list (full filters come in 4D).
-    selected = request.args.get("ticker", "").strip().upper()
-    if selected and selected not in tickers:
-        selected = ""
+    filters = parse_filters(request.args, tickers)
 
-    articles, meta = [], {"fetched_at": None, "oldest_fetch": None, "stale": False, "failed": {}}
+    articles, meta, names = [], {"fetched_at": None, "oldest_fetch": None, "stale": False, "failed": {}}, {}
     if tickers:
-        articles, meta = get_portfolio_news([selected] if selected else tickers, DAYS)
-        # Interpretation layer (4B): rule-based sentiment per article. Cheap
-        # (a dictionary lookup), so it runs on every request, no caching.
-        # Company names (from the cached quotes) help the summarizer spot
-        # sentences that name the company. Missing names are fine.
+        # Always fetch for every holding (each ticker is cached separately),
+        # then filter in memory, so the filter options reflect the full set.
+        articles, meta = get_portfolio_news(tickers, DAYS)
+        # Company names from the cached quotes: used by the summarizer and
+        # by the text search. Missing names are fine.
         names = {t: r.value["name"] for t, r in get_quotes(tickers).items() if r.value}
         for a in articles:
+            # Interpretation layer: sentiment (4B), summary + implications (4C).
+            # Cheap dictionary work, so it runs on every request, no caching.
             a["sentiment"] = analyze_article(a)
-            # 4C: extractive summary + rule-based implications (both interpretation).
             a["summary_auto"] = summarize_article(a, company=names.get(a["tickers"][0]))
             a["implications"] = implications_for_article(a)
 
+    total = len(articles)
+    categories = sorted({(a.get("category") or "").lower() for a in articles if a.get("category")})
+    shown = filter_articles(articles, filters, names)
+
     return render_template(
         "news/index.html",
-        articles=articles,
+        articles=shown,
+        total=total,
         meta=meta,
         tickers=tickers,
-        selected=selected,
+        names=names,
+        categories=categories,
+        filters=filters,
+        active_filters=active_filter_count(filters),
         days=DAYS,
         source=SOURCE,
         sentiment_method=SENTIMENT_METHOD,

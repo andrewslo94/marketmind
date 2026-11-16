@@ -161,3 +161,82 @@ def get_portfolio_news(tickers, days: int = 7) -> tuple[list[dict], dict]:
 
     articles = sorted(merged.values(), key=lambda a: a["published_at"] or "", reverse=True)
     return articles, meta
+
+
+# ---------------------------------------------------------------------------
+# Filtering (Phase 4D). Works on the already-fetched, already-analyzed list,
+# so filtering never costs a provider call.
+# ---------------------------------------------------------------------------
+from zoneinfo import ZoneInfo  # noqa: E402  (kept with the code that uses it)
+
+ET = ZoneInfo("America/New_York")
+
+
+def parse_filters(args, tickers) -> dict:
+    """
+    Turn request query parameters into a clean filters dict. Invalid values
+    are dropped silently (an unknown ticker or a bad date just means "no
+    filter"), so a hand-edited URL can't break the page.
+    """
+    def _date(value):
+        try:
+            return date.fromisoformat(value) if value else None
+        except ValueError:
+            return None
+
+    ticker = (args.get("ticker") or "").strip().upper()
+    sentiment = (args.get("sentiment") or "").strip().lower()
+    return {
+        "ticker": ticker if ticker in tickers else "",
+        "q": (args.get("q") or "").strip()[:80],
+        "date_from": _date(args.get("date_from")),
+        "date_to": _date(args.get("date_to")),
+        "category": (args.get("category") or "").strip().lower()[:40],
+        "sentiment": sentiment if sentiment in ("positive", "neutral", "negative") else "",
+    }
+
+
+def _published_date_et(article) -> Optional[date]:
+    iso = article.get("published_at")
+    if not iso:
+        return None
+    return datetime.fromisoformat(iso).astimezone(ET).date()
+
+
+def filter_articles(articles: list[dict], f: dict, names: dict) -> list[dict]:
+    """
+    Keep the articles that satisfy EVERY active filter.
+    names: {ticker: company name} so the company/text search also matches
+    "Apple" for AAPL, not only words in the headline.
+    """
+    q = f["q"].lower()
+    out = []
+    for a in articles:
+        if f["ticker"] and f["ticker"] not in a["tickers"]:
+            continue
+        if f["category"] and (a.get("category") or "").lower() != f["category"]:
+            continue
+        if f["sentiment"] and a.get("sentiment", {}).get("label") != f["sentiment"]:
+            continue
+        if f["date_from"] or f["date_to"]:
+            d = _published_date_et(a)
+            if d is None:
+                continue
+            if f["date_from"] and d < f["date_from"]:
+                continue
+            if f["date_to"] and d > f["date_to"]:
+                continue
+        if q:
+            haystack = " ".join(
+                [a["headline"], a.get("summary") or "", a["publisher"]]
+                + a["tickers"]
+                + [names.get(t, "") for t in a["tickers"]]
+            ).lower()
+            if q not in haystack:
+                continue
+        out.append(a)
+    return out
+
+
+def active_filter_count(f: dict) -> int:
+    return sum(1 for v in f.values() if v)
