@@ -27,6 +27,7 @@ calculation that needs it is skipped and the page says why.
 
 Public function
 ---------------
+get_indicator(key) -> IndicatorView for one card, e.g. get_indicator("cpi")
 build_indicators() -> {"cards": [IndicatorView, ...], "meta": {...}, ...}
     (Named "cards", not "items": in a Jinja template, econ.items would find
     the dictionary's built-in .items() method before the key.)
@@ -388,6 +389,12 @@ def _build_range(ind: Indicator, view: IndicatorView, lower_pts, upper_pts) -> I
         label=lambda d: period_label(d, "M"),
     )
     return view
+
+
+def get_indicator(key: str) -> Optional[IndicatorView]:
+    """One indicator card by key (e.g. "cpi"), for other pages. None if no such key."""
+    ind = next((i for i in INDICATORS if i.key == key), None)
+    return _build(ind) if ind else None
 
 
 def build_indicators() -> dict:

@@ -21,6 +21,7 @@ Public functions
 ----------------
 build_overview()                -> {"groups": [...], "meta": {...}, "spread": {...}}
 index_performance(range_key)    -> chart data: % change since the period start
+instrument_row(symbol)          -> one instrument's row, for other pages
 format_value / format_change / direction_of  (unit rules, unit-tested)
 """
 import logging
@@ -213,6 +214,16 @@ def _build_row(inst: Instrument) -> InstrumentRow:
     row.session = _session_label(inst.kind, quote.get("market_state"))
     row.stale = result.stale
     return row
+
+
+_BY_SYMBOL = {inst.symbol: inst for group in GROUPS for inst in group["instruments"]}
+
+
+def instrument_row(symbol: str) -> Optional[InstrumentRow]:
+    """One instrument's row, for other pages (e.g. Market developments).
+    None if the symbol isn't on the Market Overview list."""
+    inst = _BY_SYMBOL.get(symbol)
+    return _build_row(inst) if inst else None
 
 
 def yield_spread(rows) -> dict:

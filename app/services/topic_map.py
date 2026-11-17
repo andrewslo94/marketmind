@@ -11,6 +11,8 @@ recommendation. Example companies only illustrate a sector.
 
 How a topic is used
 -------------------
+live       Numbers shown beside the topic as facts: ("quote", Yahoo symbol, label)
+           from the Market Overview list, or ("fred", indicator key, label).
 keywords   An article belongs to the topic if a keyword is in its headline,
            or two different keywords are in its summary.
 exclude    Phrases removed before matching (so "trade war" isn't counted as
@@ -55,6 +57,22 @@ SECTORS = [
     "Technology", "Communication Services", "Consumer Discretionary", "Consumer Staples",
     "Energy", "Financials", "Healthcare", "Industrials", "Materials", "Real Estate", "Utilities",
 ]
+
+# Yahoo Finance reports a holding's sector with its own names; this maps them
+# onto the 11 sectors above. (Checked against Yahoo for all 45 companies below.)
+YAHOO_TO_SECTOR = {
+    "Technology": "Technology",
+    "Communication Services": "Communication Services",
+    "Consumer Cyclical": "Consumer Discretionary",
+    "Consumer Defensive": "Consumer Staples",
+    "Energy": "Energy",
+    "Financial Services": "Financials",
+    "Healthcare": "Healthcare",
+    "Industrials": "Industrials",
+    "Basic Materials": "Materials",
+    "Real Estate": "Real Estate",
+    "Utilities": "Utilities",
+}
 
 COMPANIES = {
     "AAPL": ("Apple", "Technology", ["apple"]),
@@ -114,6 +132,7 @@ READ_THROUGH = "Same industry as the reporting company"
 TOPICS = [
     {
         "key": "rates",
+        "live": [("fred", "fed_funds", "Fed funds target range"), ("quote", "^TNX", "10-year Treasury yield")],
         "name": "Interest rates & central banks",
         "why": ("Interest rates set what companies and households pay to borrow and how much investors "
                 "will pay today for profits expected later. Housing is one of the most rate-sensitive "
@@ -162,6 +181,7 @@ TOPICS = [
     },
     {
         "key": "inflation",
+        "live": [("fred", "cpi", "Inflation (CPI, 12-month)"), ("fred", "core_cpi", "Core inflation (12-month)")],
         "name": "Inflation",
         "why": ("Inflation changes what consumers can afford and what companies pay for materials and wages, "
                 "and it is the main input to central banks' interest-rate decisions."),
@@ -202,6 +222,7 @@ TOPICS = [
     },
     {
         "key": "jobs",
+        "live": [("fred", "unemployment", "Unemployment rate"), ("fred", "payrolls", "Jobs added")],
         "name": "Jobs & consumer spending",
         "why": ("Paychecks fund consumer spending, the largest part of the U.S. economy, so job and spending "
                 "data signal where company sales, and interest rates, may head."),
@@ -248,6 +269,7 @@ TOPICS = [
     },
     {
         "key": "trade",
+        "live": [],
         "name": "Tariffs & trade",
         "why": ("Tariffs are taxes on imported goods. They raise costs for companies that import parts or "
                 "products, can shield some domestic producers, and can trigger retaliation against exporters."),
@@ -289,6 +311,7 @@ TOPICS = [
     },
     {
         "key": "energy",
+        "live": [("quote", "CL=F", "WTI crude oil"), ("quote", "BZ=F", "Brent crude oil"), ("quote", "GC=F", "Gold")],
         "name": "Oil & commodities",
         "why": ("Energy is a cost for almost every business. Oil and gas prices move producers' profits and the "
                 "costs of airlines, shippers, chemical makers, and drivers. Metals such as gold and copper are "
@@ -332,6 +355,7 @@ TOPICS = [
     },
     {
         "key": "earnings",
+        "live": [("quote", "^GSPC", "S&P 500")],
         "name": "Corporate earnings",
         "why": ("Earnings show whether companies are growing their profits. Results and forecasts from large "
                 "companies can move their whole industry, because investors read them as signals for peers."),
@@ -365,6 +389,7 @@ TOPICS = [
     },
     {
         "key": "tech_ai",
+        "live": [("quote", "^IXIC", "Nasdaq Composite")],
         "name": "Technology & AI",
         "why": ("Spending on artificial intelligence, chips, and data centers is one of the largest investment "
                 "themes in markets. It drives demand for semiconductors, cloud services, and electricity."),
@@ -409,6 +434,7 @@ TOPICS = [
     },
     {
         "key": "geopolitics",
+        "live": [("quote", "^VIX", "VIX volatility index"), ("quote", "BZ=F", "Brent crude oil"), ("quote", "GC=F", "Gold")],
         "name": "Geopolitics & conflict",
         "why": ("Conflicts, sanctions, and diplomacy can disrupt energy supplies and shipping, change defense "
                 "spending, and push investors toward assets they see as safer, such as gold."),

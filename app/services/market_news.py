@@ -23,9 +23,12 @@ against thousands of phrases stays fast.
 Known limit: keyword rules can't read negation ("no rate cut") or sarcasm,
 so the page shows the matched words for every signal and lets you judge.
 
-Public function
----------------
-build_developments() -> {"developments": [...], "quiet": [...], "headlines": [...], "meta": {...}}
+Public functions
+----------------
+build_developments()                 -> {"developments": [...], "quiet": [...], "headlines": [...], "meta": {...}}
+sector_impact(developments, exposure) -> each sector's signals across all developments (5D)
+link_holdings(developments, exposure) -> marks which of the user's holdings each development touches
+attach_live_numbers(developments)     -> adds related market numbers (facts) to each development
 """
 import logging
 import re
@@ -35,6 +38,8 @@ from datetime import datetime
 from typing import Optional
 
 from app.services import topic_map as tm
+from app.services.fred_service import get_indicator
+from app.services.market_overview import instrument_row
 from app.services.news_service import NewsError, get_market_news
 
 log = logging.getLogger(__name__)
@@ -43,6 +48,7 @@ HEADLINE_HITS_NEEDED = 1
 SUMMARY_HITS_NEEDED = 2
 FACT_ARTICLES_SHOWN = 3
 LEAN_RATIO = 2  # one direction needs at least 2x the articles of the other
+MIN_LEAN_ARTICLES = 2  # ...and at least this many articles: one story isn't a trend
 
 
 def normalize(text: Optional[str]) -> str:
@@ -104,7 +110,9 @@ def detect_signal(topic: dict, articles) -> dict:
     """
     Which direction does the coverage lean? Counts articles (not words) that
     contain each scenario's phrases. A scenario 'leads' when it has more
-    articles than the other and at least LEAN_RATIO times as many.
+    articles than the other, at least LEAN_RATIO times as many, and at least
+    MIN_LEAN_ARTICLES articles. A lone article is reported as "weak": the
+    page names it but shows both scenarios.
     """
     counts, words = {}, {}
     for s in topic["scenarios"]:
@@ -120,15 +128,23 @@ def detect_signal(topic: dict, articles) -> dict:
 
     first, second = topic["scenarios"]
     a, b = counts[first["key"]], counts[second["key"]]
+    candidate = None
     if a == b == 0:
-        status, lead = "none", None
+        status = "none"
     elif a > b and a >= LEAN_RATIO * b:
-        status, lead = "leans", first
+        candidate = first
     elif b > a and b >= LEAN_RATIO * a:
-        status, lead = "leans", second
+        candidate = second
     else:
-        status, lead = "mixed", None
-    return {"status": status, "lead": lead, "counts": counts, "words": words}
+        status = "mixed"
+
+    lead = weak = None
+    if candidate:
+        if counts[candidate["key"]] >= MIN_LEAN_ARTICLES:
+            status, lead = "leans", candidate
+        else:
+            status, weak = "weak", candidate
+    return {"status": status, "lead": lead, "weak": weak, "counts": counts, "words": words}
 
 
 # ---------- building the page model ----------
@@ -138,7 +154,7 @@ def _company(ticker: str) -> dict:
 
 
 def _effects(lines) -> list:
-    return [{"sector": sector, "detail": detail, "companies": [_company(t) for t in tickers]}
+    return [{"sector": sector, "qualifier": None, "detail": detail, "companies": [_company(t) for t in tickers]}
             for sector, detail, tickers in lines]
 
 
@@ -152,7 +168,7 @@ def _read_through(lines, mentioned) -> list:
         by_sector.setdefault(tm.COMPANIES[ticker][1], []).append(ticker)
     if not by_sector:
         return _effects(lines)
-    return [{"sector": f"{sector} (industry of companies named in the coverage)", "detail": detail,
+    return [{"sector": sector, "qualifier": "industry of companies named in the coverage", "detail": detail,
              "companies": [_company(t) for t in tickers]} for sector, tickers in by_sector.items()]
 
 
@@ -168,6 +184,8 @@ class Development:
     lead_key: Optional[str] = None
     mentioned: list = field(default_factory=list)
     monitor: list = field(default_factory=list)
+    held: list = field(default_factory=list)  # user's holdings in the sectors this touches (5D)
+    live: list = field(default_factory=list)  # related market numbers, facts (5D)
 
     @property
     def shown(self):
@@ -248,3 +266,109 @@ def build_developments() -> dict:
             "sources": [s for s, _n in Counter(a["publisher"] for a in headlines).most_common()],
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 5D: sector rollup, the user's holdings, and live numbers
+# ---------------------------------------------------------------------------
+LEAN_LABELS = {
+    "positive": ("▲", "Signals lean positive"),
+    "negative": ("▼", "Signals lean negative"),
+    "mixed": ("◆", "Mixed signals"),
+    "either": ("◆", "Direction unclear"),
+    "none": ("", "No current signal"),
+}
+_TOPIC_BY_KEY = {t["key"]: t for t in tm.TOPICS}
+
+
+def _counted_scenarios(d: Development) -> list:
+    """The scenario(s) that count for the rollup: only the leading one when
+    coverage leans one way, otherwise both (direction unknown)."""
+    return d.scenarios[:1] if d.lead_key else d.scenarios
+
+
+def sector_impact(developments, exposure) -> dict:
+    """
+    Roll every development up by sector. A development whose coverage leans
+    one way adds its leading scenario's positive and negative sector lines;
+    one without a clear direction marks its sectors "direction unclear".
+    Each sector then gets a label (lean positive / negative / mixed / unclear)
+    and the evidence behind it. `weight` (articles behind the signals) is
+    only used to order the sectors.
+    """
+    rows = {s: {"sector": s, "positive": [], "negative": [], "either": [], "weight": 0,
+                "held": exposure["sectors"].get(s)} for s in tm.SECTORS}
+    for d in developments:
+        if d.lead_key:
+            lead = d.scenarios[0]
+            for kind in ("positive", "negative"):
+                for e in lead[kind]:
+                    if e["sector"] in rows:
+                        rows[e["sector"]][kind].append({"topic": d.name, "topic_key": d.key, "coverage": d.coverage,
+                                                        "detail": e["detail"], "scenario": lead["label"]})
+                        rows[e["sector"]]["weight"] += d.coverage
+        else:
+            touched = {e["sector"] for sc in d.scenarios for e in sc["positive"] + sc["negative"] if e["sector"] in rows}
+            for sector in sorted(touched):
+                rows[sector]["either"].append({"topic": d.name, "topic_key": d.key, "coverage": d.coverage})
+                rows[sector]["weight"] += d.coverage
+
+    for r in rows.values():
+        has_pos, has_neg = bool(r["positive"]), bool(r["negative"])
+        if has_pos and has_neg:
+            r["lean"] = "mixed"
+        elif has_pos:
+            r["lean"] = "positive"
+        elif has_neg:
+            r["lean"] = "negative"
+        else:
+            r["lean"] = "either" if r["either"] else "none"
+        r["icon"], r["label"] = LEAN_LABELS[r["lean"]]
+
+    active = sorted((r for r in rows.values() if r["lean"] != "none"), key=lambda r: r["weight"], reverse=True)
+    return {
+        "rows": active,
+        "quiet": [r["sector"] for r in rows.values() if r["lean"] == "none"],
+        "held_rows": sorted((r for r in rows.values() if r["held"]), key=lambda r: r["held"]["pct"], reverse=True),
+    }
+
+
+def link_holdings(developments, exposure) -> None:
+    """Set d.held: the user's holdings in sectors this development could affect."""
+    for d in developments:
+        sectors = {e["sector"] for sc in _counted_scenarios(d) for e in sc["positive"] + sc["negative"]}
+        d.held = [{"sector": sector, "pct": info["pct"], "tickers": info["tickers"]}
+                  for sector, info in exposure["sectors"].items() if sector in sectors]
+
+
+def attach_live_numbers(developments) -> None:
+    """
+    Set d.live: the numbers listed under the topic's "live" key in the map,
+    taken from the same cached sources as the Market Overview page (Yahoo
+    quotes, FRED indicators), each with its own time or period.
+    """
+    for d in developments:
+        numbers = []
+        for kind, ref, label in _TOPIC_BY_KEY[d.key].get("live", []):
+            if kind == "quote":
+                row = instrument_row(ref)
+                if row is None:
+                    continue
+                change = row.change_text + (f" ({row.change_pct_text})" if row.change_pct_text != "—" else "")
+                numbers.append({
+                    "label": label, "kind": kind, "available": row.available,
+                    "value": row.value_text + (f" {row.unit}" if row.unit and row.available else ""),
+                    "change": change if row.available else None, "direction": row.direction,
+                    "when": row.market_time, "session": row.session, "stale": row.stale,
+                    "source": "Yahoo Finance, delayed",
+                })
+            else:
+                view = get_indicator(ref)
+                if view is None:
+                    continue
+                numbers.append({
+                    "label": label, "kind": kind, "available": view.available, "value": view.value_text,
+                    "period": view.period, "calculated": bool(view.calc_label), "stale": view.stale,
+                    "source": "FRED",
+                })
+        d.live = numbers

@@ -21,7 +21,7 @@
 <ul class="mm-effect-list">
     {% for e in entries %}
     <li>
-        <strong>{{ e.sector }}</strong>: {{ e.detail }}
+        <strong>{{ e.sector }}</strong>{% if e.qualifier %} <span class="mm-row-sub">({{ e.qualifier }})</span>{% endif %}: {{ e.detail }}
         {% if e.companies %}
         <span class="mm-row-sub">Example companies:
             {% for c in e.companies %}<a href="{{ url_for('stocks.detail', ticker=c.ticker) }}" title="{{ c.name }}">{{ c.ticker }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
@@ -82,6 +82,61 @@
     {% if dev.quiet %}<span class="mm-group-note ms-1">No coverage right now: {{ dev.quiet|join(", ") }}.</span>{% endif %}
 </div>
 
+{# ---- Sector impact summary (5D): interpretation rolled up by sector ---- #}
+{% macro lean_badge(r) %}<span class="badge mm-lean mm-lean-{{ r.lean }}">{% if r.icon %}{{ r.icon }} {% endif %}{{ r.label }}</span>{% endmacro %}
+<div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mm-section-title">
+    <h2 class="h6 fw-semibold mb-0">Sector impact summary <span class="badge mm-badge-interp ms-1">Interpretation</span></h2>
+    <span class="mm-group-note">Rolled up from the topic cards below: leading scenarios count; unclear ones show as "direction unclear"</span>
+</div>
+
+{# Your portfolio: which of your sectors these developments touch (sector weights are facts; signals are interpretation) #}
+<div class="mm-card mb-3">
+    <div class="mm-dev-col-title">Your portfolio and these developments</div>
+    {% if not exposure.has_holdings %}
+    <p class="mm-muted small mb-0">Add holdings to see which of these developments touch your portfolio.
+        <a href="{{ url_for('portfolio.add_holding') }}">Add a holding</a></p>
+    {% else %}
+    {% for r in impact.held_rows %}
+    <div class="mm-held-row">
+        <div>
+            <strong>{{ r.sector }}</strong>
+            <span class="mm-row-sub"> · {{ "%.1f"|format(r.held.pct) }}% of your portfolio value ·
+                {% for t in r.held.tickers %}<a href="{{ url_for('stocks.detail', ticker=t) }}">{{ t }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            {{ lean_badge(r) }}
+            {% for e in r.positive + r.negative + r.either %}<a class="mm-chip mm-chip-interp py-0" href="#topic-{{ e.topic_key }}">{{ e.topic }}</a>{% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+    {% for u in exposure.unclassified %}
+    <div class="mm-row-sub mt-2">{{ u.ticker }}{% if u.pct is not none %} ({{ "%.1f"|format(u.pct) }}%){% endif %}: {{ u.reason }}, so it isn't matched to one sector.</div>
+    {% endfor %}
+    <div class="mm-row-sub mt-2">Sector weights use the sector Yahoo Finance reports for each holding and your current delayed values.</div>
+    {% endif %}
+</div>
+
+{# All sectors with a current signal #}
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-2">
+    {% for r in impact.rows %}
+    <div class="col">
+        <div class="mm-card h-100">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="fw-semibold">{{ r.sector }}</div>
+                {{ lean_badge(r) }}
+            </div>
+            {% if r.held %}<div class="mm-held-badge">You hold {{ "%.1f"|format(r.held.pct) }}% · {{ r.held.tickers|join(", ") }}</div>{% endif %}
+            <ul class="mm-sector-signals">
+                {% for e in r.positive %}<li><span class="mm-gain">▲</span> <a href="#topic-{{ e.topic_key }}">{{ e.topic }}</a>: {{ e.detail }} <span class="mm-row-sub">({{ e.coverage }} article{{ "s" if e.coverage != 1 }})</span></li>{% endfor %}
+                {% for e in r.negative %}<li><span class="mm-loss">▼</span> <a href="#topic-{{ e.topic_key }}">{{ e.topic }}</a>: {{ e.detail }} <span class="mm-row-sub">({{ e.coverage }} article{{ "s" if e.coverage != 1 }})</span></li>{% endfor %}
+                {% for e in r.either %}<li><span class="mm-muted">◆</span> <a href="#topic-{{ e.topic_key }}">{{ e.topic }}</a>: could go either way; coverage shows no clear direction <span class="mm-row-sub">({{ e.coverage }} article{{ "s" if e.coverage != 1 }})</span></li>{% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% if impact.quiet %}<p class="mm-group-note mb-4">No current signal: {{ impact.quiet|join(", ") }}.</p>{% endif %}
+
 {# ---- One card per development ---- #}
 {% for d in dev.developments %}
 {% set sig = d.signal %}
@@ -110,6 +165,27 @@
                     <span class="mm-muted">None from MarketMind's example-company list.</span>
                 {% endif %}
             </div>
+            {% if d.live %}
+            <div class="mt-3">
+                <div class="mm-dev-col-title">Related numbers</div>
+                {% for n in d.live %}
+                <div class="mm-live-row">
+                    <span class="mm-live-name">{{ n.label }}</span>
+                    {% if n.available %}
+                    <span class="mm-live-value">{{ n.value }}</span>
+                    {% if n.kind == "quote" %}
+                    <span class="small {{ 'mm-gain' if n.direction == 'up' else ('mm-loss' if n.direction == 'down' else 'mm-muted') }}">{{ "▲" if n.direction == "up" else ("▼" if n.direction == "down" else "●") }} {{ n.change }}</span>
+                    <span class="mm-row-sub w-100">{{ n.when|et_time if n.when else "time unavailable" }}{% if n.session %} · {{ n.session }}{% endif %} · {{ n.source }}{% if n.stale %} · stale{% endif %}</span>
+                    {% else %}
+                    <span class="mm-row-sub w-100">{{ n.period }}{% if n.calculated %} · calculated{% endif %} · {{ n.source }}{% if n.stale %} · stale{% endif %}</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="mm-row-sub">Data unavailable</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
 
         {# Right: interpretation #}
@@ -125,9 +201,13 @@
                     Coverage leans toward <strong>{{ sig.lead.label|lower }}</strong>:
                     {{ sig.counts[sig.lead.key] }} article{{ "s" if sig.counts[sig.lead.key] != 1 }} use those words,
                     vs {{ sig.counts[d.scenarios[1].key] }} for the opposite direction.
+                    {% elif sig.status == "weak" %}
+                    Too little to call a direction: only {{ sig.counts[sig.weak.key] }} article points to
+                    {{ sig.weak.label|lower }}, so both scenarios are shown.
                     {% elif sig.status == "mixed" %}
-                    Mixed: {{ sig.counts[d.scenarios[0].key] }} article(s) point to {{ d.scenarios[0].label|lower }} and
-                    {{ sig.counts[d.scenarios[1].key] }} to {{ d.scenarios[1].label|lower }}, so both scenarios are shown.
+                    {% set n0, n1 = sig.counts[d.scenarios[0].key], sig.counts[d.scenarios[1].key] %}
+                    Mixed: {{ n0 }} article{{ "s" if n0 != 1 }} point{{ "" if n0 != 1 else "s" }} to {{ d.scenarios[0].label|lower }} and
+                    {{ n1 }} to {{ d.scenarios[1].label|lower }}, so both scenarios are shown.
                     {% else %}
                     No direction words found in this coverage, so both scenarios are shown.
                     {% endif %}
@@ -148,6 +228,13 @@
                 <div class="row g-3">
                     {% for s in d.scenarios %}<div class="col-md-6">{{ scenario(s) }}</div>{% endfor %}
                 </div>
+                {% endif %}
+
+                {% if d.held %}
+                <p class="mm-held-line">Your holdings in these sectors:
+                    {% for h in d.held %}<strong>{{ h.sector }}</strong> {{ "%.1f"|format(h.pct) }}%
+                    ({% for t in h.tickers %}<a href="{{ url_for('stocks.detail', ticker=t) }}">{{ t }}</a>{% if not loop.last %}, {% endif %}{% endfor %}){% if not loop.last %}; {% endif %}{% endfor %}
+                </p>
                 {% endif %}
 
                 <h3>What to monitor next</h3>

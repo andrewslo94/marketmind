@@ -363,3 +363,31 @@ Phase 1 complete.
 - Live: 37 of 100 articles matched; six topic cards (geopolitics 12 leaning "tensions rising" 6–0, oil 10 mixed 1–1, tech & AI 9, earnings 6 naming NVDA, rates 4, jobs 1); no coverage for inflation or trade. Page renders, example-company links open stock pages, tabs on both Markets pages, News page unchanged after the refactor ("Showing 40 of 40"), missing key → "Data unavailable". Desktop and phone screenshots checked.
 
 **Known limits (shown on the page):** keyword rules can't read negation ("no rate cut") or context, so every signal lists its matched words; sector effects are general textbook relationships, not predictions.
+
+---
+
+## 2026-11-17 — Phase 5D: Sector impact summary, portfolio exposure, live numbers (Phase 5 complete)
+
+**Before starting:** Logan committed 5C (e3c37dd) and said "Start 5D". No install.
+
+**Data check first:** a holding's sector comes from Yahoo, which uses its own names ("Consumer Cyclical", "Financial Services", "Basic Materials", ...). Fetched Yahoo's sector for all 45 example companies in the topic map: Yahoo uses exactly 11 names, and every company, translated, matches the sector we filed it under. Funds report no sector (SPY: `None`), so they're never guessed.
+
+**What we built**
+- `app/services/topic_map.py`: `YAHOO_TO_SECTOR` (Yahoo's names → the 11 sectors) and a `live` list per topic: the numbers to show beside it, e.g. rates → Fed funds target range (FRED) + 10-year Treasury yield (Yahoo); oil → WTI, Brent, gold; geopolitics → VIX, Brent, gold.
+- `app/services/portfolio_calc.py`: each holding row keeps Yahoo's `sector` and `quote_type`; new `sector_exposure(summary)` = share of current USD value per sector, largest first. Funds, unpriced holdings, and non-USD holdings are listed separately with the reason. Reusable for Phase 6's diversification check and Phase 7's risk question.
+- `app/services/market_news.py`: `sector_impact()` rolls every development up by sector (leading scenarios add ▲/▼ lines; developments without a clear direction mark their sectors "direction unclear") and labels each sector *signals lean positive / negative*, *mixed*, *direction unclear*, or *no current signal*, with the evidence and article counts; `link_holdings()` marks which of your holdings each development touches; `attach_live_numbers()` adds the related numbers (facts, each with its own time or period).
+- `app/services/market_overview.py` `instrument_row(symbol)` and `app/services/fred_service.py` `get_indicator(key)`: small public lookups so other pages reuse the cached quotes and indicator cards.
+- `app/routes/market.py`: the developments route now builds exposure → impact → holdings links → live numbers.
+- `app/templates/market/developments.html` + `style.css`: "Sector impact summary" (labeled interpretation) with a "Your portfolio and these developments" panel (your sectors' weights, label, linked topics, funds explained) and a card per sector with signals; "Related numbers" in each topic's facts column; "Your holdings in these sectors" in each interpretation panel.
+
+**Problems and fixes**
+- The jobs topic "leaned strengthening" on **one** article, and that one article labeled Utilities and Real Estate "lean negative" and Financials "lean positive". One story isn't a trend: a direction now needs at least **2 articles** (plus the existing 2× rule). A lone article shows as "Too little to call a direction", and both scenarios are shown. This also improves the 5C cards.
+- "(1 articles)" / "1 article(s)" grammar fixed.
+- Earnings read-through lines kept the label "(industry of companies named...)" inside the sector name, which would break the rollup; split into a plain `sector` plus a display `qualifier`.
+
+**Testing**
+- Exposure with AAPL, MSFT, XOM, JNJ, SPY, SHOP.TO: Technology 45.8% (AAPL, MSFT), Energy 30.6%, Healthcare 10.2%, SPY 13.4% listed as a fund; sector shares + fund share = 100.0% of USD value; SHOP.TO listed as CAD.
+- Rollup on controlled developments built from the real map: geopolitics "rising" makes Industrials *mixed* (defense ▲, airlines ▼), Technology *negative*, Energy and Materials *positive*; untouched sectors *no current signal*; holdings linked per development (leading scenario only vs both when unclear).
+- One article → "weak"; two → "leans". Live: every topic's related numbers available (e.g. VIX 25.39, Brent $93.40, Fed range 3.75–4.00%, unemployment 4.1% Oct 2026). Page with holdings shows the panel, "You hold" badges, per-card holdings lines; a user without holdings sees an invitation instead. Portfolio, Overview, News, Stock pages unchanged. Desktop screenshots checked.
+
+**Phase 5 is complete:** market overview (indexes, yields, commodities), FRED economic indicators, market developments with topic detection, and sector impact connected to the user's portfolio.

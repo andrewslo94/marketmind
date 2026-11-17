@@ -6,18 +6,28 @@ GET /market/                          the page: indexes, Treasury yields, commod
 GET /market/performance.json?range=   chart data: % change of three U.S. indexes
                                       (called by static/js/market_chart.js)
 GET /market/developments              market news grouped into topics, with
-                                      rule-based sector impact (interpretation)
+                                      rule-based sector impact (interpretation),
+                                      the user's sector exposure, and live numbers
 
 Login-protected like the other data pages, so only signed-in users trigger
 provider calls. All data and calculations live in services/market_overview.py
 and services/fred_service.py.
 """
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
+
+from app.models import Holding
 
 from app.services.fred_service import build_indicators
 from app.services.market_data import SOURCE
-from app.services.market_news import FACT_ARTICLES_SHOWN, build_developments
+from app.services.market_news import (
+    FACT_ARTICLES_SHOWN,
+    attach_live_numbers,
+    build_developments,
+    link_holdings,
+    sector_impact,
+)
+from app.services.portfolio_calc import build_portfolio, sector_exposure
 from app.services.market_overview import PERFORMANCE_RANGES, build_overview, index_performance
 
 market_bp = Blueprint("market", __name__, url_prefix="/market")
@@ -55,4 +65,17 @@ def performance_json():
 @market_bp.route("/developments")
 @login_required
 def developments():
-    return render_template("market/developments.html", dev=build_developments(), shown=FACT_ARTICLES_SHOWN)
+    dev = build_developments()
+    # 5D: connect the developments to this user's portfolio and to live numbers.
+    holdings = Holding.query.filter_by(user_id=current_user.id).all()
+    exposure = sector_exposure(build_portfolio(holdings))
+    impact = sector_impact(dev["developments"], exposure)
+    link_holdings(dev["developments"], exposure)
+    attach_live_numbers(dev["developments"])
+    return render_template(
+        "market/developments.html",
+        dev=dev,
+        impact=impact,
+        exposure=exposure,
+        shown=FACT_ARTICLES_SHOWN,
+    )

@@ -25,6 +25,7 @@ from datetime import datetime
 from typing import Optional
 
 from app.services.market_data import get_quotes
+from app.services.topic_map import YAHOO_TO_SECTOR
 
 BASE_CURRENCY = "USD"
 
@@ -45,6 +46,8 @@ class HoldingRow:
     priced: bool = False
     name: Optional[str] = None
     currency: Optional[str] = None
+    sector: Optional[str] = None  # as Yahoo reports it ("Consumer Cyclical", ...); None for funds
+    quote_type: Optional[str] = None  # "EQUITY" or "ETF"
     price: Optional[float] = None
     previous_close: Optional[float] = None
     value: Optional[float] = None
@@ -135,6 +138,8 @@ def build_portfolio(holdings) -> PortfolioSummary:
         row.priced = True
         row.name = quote.get("name")
         row.currency = quote.get("currency")
+        row.sector = quote.get("sector")
+        row.quote_type = quote.get("quote_type")
         row.price = quote["price"]
         row.previous_close = quote.get("previous_close")
         row.value = h.shares * row.price
@@ -200,3 +205,35 @@ def allocation_chart_data(summary: PortfolioSummary) -> dict:
         "pcts": [round(r.allocation_pct, 2) for r in rows],
         "values": [round(r.value, 2) for r in rows],
     }
+
+
+def sector_exposure(summary: PortfolioSummary) -> dict:
+    """
+    How much of the portfolio's current USD value sits in each of the 11
+    sectors, using the sector Yahoo reports for each holding. A fund (ETF)
+    holds many sectors and isn't split up, so it's listed separately, as are
+    holdings without a price or outside the USD totals.
+
+    Returns {"has_holdings": bool,
+             "sectors": {sector: {"pct", "value", "tickers"}}  (largest first),
+             "unclassified": [{"ticker", "reason", "pct"}]}
+    """
+    sectors, unclassified = {}, []
+    for r in summary.rows:
+        if not r.priced:
+            unclassified.append({"ticker": r.ticker, "reason": "no price available", "pct": None})
+            continue
+        if not r.in_totals:
+            unclassified.append({"ticker": r.ticker, "reason": f"priced in {r.currency}, outside the USD totals", "pct": None})
+            continue
+        sector = YAHOO_TO_SECTOR.get(r.sector or "")
+        if sector is None:
+            reason = "a fund (ETF) that holds many sectors" if r.quote_type == "ETF" else "no sector reported"
+            unclassified.append({"ticker": r.ticker, "reason": reason, "pct": r.allocation_pct})
+            continue
+        entry = sectors.setdefault(sector, {"pct": 0.0, "value": 0.0, "tickers": []})
+        entry["pct"] += r.allocation_pct or 0.0
+        entry["value"] += r.value or 0.0
+        entry["tickers"].append(r.ticker)
+    ordered = dict(sorted(sectors.items(), key=lambda kv: kv[1]["pct"], reverse=True))
+    return {"has_holdings": summary.holding_count > 0, "sectors": ordered, "unclassified": unclassified}
