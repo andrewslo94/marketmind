@@ -5,6 +5,8 @@ GET /market/                          the page: indexes, Treasury yields, commod
                                       and U.S. economic indicators (FRED)
 GET /market/performance.json?range=   chart data: % change of three U.S. indexes
                                       (called by static/js/market_chart.js)
+GET /market/developments              market news grouped into topics, with
+                                      rule-based sector impact (interpretation)
 
 Login-protected like the other data pages, so only signed-in users trigger
 provider calls. All data and calculations live in services/market_overview.py
@@ -15,6 +17,7 @@ from flask_login import login_required
 
 from app.services.fred_service import build_indicators
 from app.services.market_data import SOURCE
+from app.services.market_news import FACT_ARTICLES_SHOWN, build_developments
 from app.services.market_overview import PERFORMANCE_RANGES, build_overview, index_performance
 
 market_bp = Blueprint("market", __name__, url_prefix="/market")
@@ -47,3 +50,9 @@ def performance_json():
         return jsonify(ok=False, reason="unavailable", failed=data["failed"]), 503
 
     return jsonify(ok=True, source=SOURCE, delayed=True, timezone="America/New_York", **data)
+
+
+@market_bp.route("/developments")
+@login_required
+def developments():
+    return render_template("market/developments.html", dev=build_developments(), shown=FACT_ARTICLES_SHOWN)

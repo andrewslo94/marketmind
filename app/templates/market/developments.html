@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Market developments{% endblock %}
+
+{% block content %}
+{# ================= Reusable pieces (macros) ================= #}
+{% macro article_line(a, topic_key=None) %}
+<div class="mm-dev-article">
+    <a class="mm-article-title" href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.headline }}</a>
+    <div class="mm-article-meta mt-1">
+        {{ a.publisher }} · {{ a.published_at|fromiso|et_time if a.published_at else "time unavailable" }}
+        {% if topic_key and a.topics.get(topic_key) %}<span class="mm-row-sub"> · matched: {{ a.topics[topic_key]|join(", ") }}</span>{% endif %}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro effect_block(entries, kind) %}
+{% if entries %}
+<div class="mm-effect-title {{ 'mm-gain' if kind == 'positive' else 'mm-loss' }}">
+    {{ "▲ Potential positive implications" if kind == "positive" else "▼ Potential negative implications" }}
+</div>
+<ul class="mm-effect-list">
+    {% for e in entries %}
+    <li>
+        <strong>{{ e.sector }}</strong>: {{ e.detail }}
+        {% if e.companies %}
+        <span class="mm-row-sub">Example companies:
+            {% for c in e.companies %}<a href="{{ url_for('stocks.detail', ticker=c.ticker) }}" title="{{ c.name }}">{{ c.ticker }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+        </span>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}
+
+{% macro scenario(s, lead=False) %}
+<div class="mm-scenario {% if lead %}mm-scenario-lead{% endif %}">
+    <div class="small fw-semibold mb-1">Scenario: {{ s.label }}</div>
+    {{ effect_block(s.positive, "positive") }}
+    {{ effect_block(s.negative, "negative") }}
+</div>
+{% endmacro %}
+
+{# ================= Page ================= #}
+<div class="mb-2">
+    <p class="mm-eyebrow mb-1">Section C</p>
+    <h1 class="h3 mb-0">Market developments</h1>
+</div>
+<nav class="nav mm-subnav mb-3" aria-label="Markets sections">
+    <a class="nav-link" href="{{ url_for('market.index') }}">Overview</a>
+    <a class="nav-link active" aria-current="page" href="{{ url_for('market.developments') }}">Developments &amp; sector impact</a>
+</nav>
+
+{% if dev.error %}
+<div class="mm-card text-center py-5">
+    <h2 class="h5 mb-2">Data unavailable</h2>
+    <p class="mm-muted mb-0">Market news couldn't be loaded: {{ dev.error }}.</p>
+</div>
+{% else %}
+{% set m = dev.meta %}
+
+{# ---- Provenance: facts vs interpretation ---- #}
+<div class="mm-data-note mb-3 {% if m.stale %}is-warn{% endif %}">
+    <span class="badge mm-badge-delayed">Verified facts</span>
+    <span>Headlines, publishers, and times are shown exactly as reported by Finnhub general market news
+        ({{ m.sources|join(", ") }}): the latest {{ m.total }} articles{% if m.oldest and m.newest %}, published
+        {{ m.oldest|fromiso|et_time }} to {{ m.newest|fromiso|et_time }}{% endif %}.</span>
+    <span>Fetched {{ m.fetched_at|et_time }}; cached 30 minutes.</span>
+    {% if m.stale %}<span><strong>Provider unreachable:</strong> showing cached articles.</span>{% endif %}
+    <span class="badge mm-badge-interp">Interpretation</span>
+    <span>Topics, direction signals, and sector effects come from MarketMind's keyword map, not from the publishers.
+        They describe how this kind of news could affect sectors in general. They are not forecasts, and never
+        buy or sell advice.</span>
+</div>
+
+{# ---- Topic summary chips ---- #}
+<div class="d-flex flex-wrap gap-2 align-items-center mb-4">
+    <span class="mm-group-note me-1">Topics in this news ({{ m.matched }} of {{ m.total }} articles matched):</span>
+    {% for d in dev.developments %}
+    <a class="mm-chip mm-chip-interp" href="#topic-{{ d.key }}">{{ d.name }} <span class="mm-chip-count">{{ d.coverage }}</span></a>
+    {% endfor %}
+    {% if dev.quiet %}<span class="mm-group-note ms-1">No coverage right now: {{ dev.quiet|join(", ") }}.</span>{% endif %}
+</div>
+
+{# ---- One card per development ---- #}
+{% for d in dev.developments %}
+{% set sig = d.signal %}
+<section class="mm-card mb-4" id="topic-{{ d.key }}">
+    <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-3">
+        <h2 class="h5 mb-0">{{ d.name }}</h2>
+        <span class="mm-group-note">{{ d.coverage }} of {{ m.total }} recent articles</span>
+    </div>
+    <div class="row g-4">
+        {# Left: facts #}
+        <div class="col-lg-5">
+            <div class="mm-dev-col-title"><span class="badge mm-badge-delayed me-1">Verified facts</span> What happened</div>
+            <div class="mm-row-sub mb-1">Most on-topic articles first.</div>
+            {% for a in d.shown %}{{ article_line(a, d.key) }}{% endfor %}
+            {% if d.more %}
+            <details class="mm-more">
+                <summary>Show {{ d.more|length }} more article{{ "s" if d.more|length != 1 }}</summary>
+                {% for a in d.more %}{{ article_line(a, d.key) }}{% endfor %}
+            </details>
+            {% endif %}
+            <div class="small mt-3">
+                <span class="mm-fact-label">Companies named</span>
+                {% if d.mentioned %}
+                    {% for c in d.mentioned %}<a href="{{ url_for('stocks.detail', ticker=c.ticker) }}">{{ c.ticker }}</a> ({{ c.name }}){% if not loop.last %}, {% endif %}{% endfor %}
+                {% else %}
+                    <span class="mm-muted">None from MarketMind's example-company list.</span>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Right: interpretation #}
+        <div class="col-lg-7">
+            <div class="mm-interp-panel">
+                <span class="mm-interp-label">Interpretation · rule-based</span>
+                <h3>Why it matters</h3>
+                <p class="mb-0">{{ d.why }}</p>
+
+                <h3>Direction in this coverage</h3>
+                <p class="mb-1">
+                    {% if sig.status == "leans" %}
+                    Coverage leans toward <strong>{{ sig.lead.label|lower }}</strong>:
+                    {{ sig.counts[sig.lead.key] }} article{{ "s" if sig.counts[sig.lead.key] != 1 }} use those words,
+                    vs {{ sig.counts[d.scenarios[1].key] }} for the opposite direction.
+                    {% elif sig.status == "mixed" %}
+                    Mixed: {{ sig.counts[d.scenarios[0].key] }} article(s) point to {{ d.scenarios[0].label|lower }} and
+                    {{ sig.counts[d.scenarios[1].key] }} to {{ d.scenarios[1].label|lower }}, so both scenarios are shown.
+                    {% else %}
+                    No direction words found in this coverage, so both scenarios are shown.
+                    {% endif %}
+                </p>
+                {% for s in d.scenarios if sig.words[s.key] %}
+                <p class="mm-row-sub mb-1">{{ s.label }} words matched:
+                    {% for w, n in sig.words[s.key] %}"{{ w }}"{% if n > 1 %} ×{{ n }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+                {% endfor %}
+
+                <h3>Sectors that could be affected</h3>
+                {% if d.lead_key %}
+                {{ scenario(d.scenarios[0], lead=True) }}
+                <details class="mm-more">
+                    <summary>Opposite scenario: {{ d.scenarios[1].label }}</summary>
+                    <div class="mt-2">{{ scenario(d.scenarios[1]) }}</div>
+                </details>
+                {% else %}
+                <div class="row g-3">
+                    {% for s in d.scenarios %}<div class="col-md-6">{{ scenario(s) }}</div>{% endfor %}
+                </div>
+                {% endif %}
+
+                <h3>What to monitor next</h3>
+                <ul class="mb-0 ps-3">{% for x in d.monitor %}<li>{{ x }}</li>{% endfor %}</ul>
+            </div>
+        </div>
+    </div>
+</section>
+{% endfor %}
+
+{# ---- Full feed: every latest headline (facts), with topic tags ---- #}
+<div class="d-flex justify-content-between align-items-baseline mm-section-title">
+    <h2 class="h6 fw-semibold mb-0">All latest market headlines</h2>
+    <span class="mm-group-note">{{ m.unmatched }} of {{ m.total }} matched no topic</span>
+</div>
+{% macro headline_row(a) %}
+<div class="mm-headline-row">
+    <div class="mm-headline-time">{{ a.published_at|fromiso|et_time if a.published_at else "—" }}</div>
+    <div class="flex-grow-1">
+        <a class="mm-article-title fw-normal" href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.headline }}</a>
+        <span class="mm-row-sub"> · {{ a.publisher }}</span>
+        {% for k in a.topics %} <a class="mm-chip mm-chip-interp py-0" href="#topic-{{ k }}">{{ dev.topic_names[k] }}</a>{% endfor %}
+    </div>
+</div>
+{% endmacro %}
+<div class="mm-card mb-3">
+    {% for a in dev.headlines[:20] %}{{ headline_row(a) }}{% endfor %}
+    {% if dev.headlines|length > 20 %}
+    <details class="mm-more">
+        <summary>Show {{ dev.headlines|length - 20 }} more headlines</summary>
+        {% for a in dev.headlines[20:] %}{{ headline_row(a) }}{% endfor %}
+    </details>
+    {% endif %}
+</div>
+
+<p class="small mm-muted mb-0">
+    Example companies illustrate each sector and are not recommendations. Keyword rules can't read negation or
+    context ("no rate cut" still contains "rate cut"), so every signal shows the words it matched; read the article
+    before drawing conclusions.
+</p>
+{% endif %}
+{% endblock %}

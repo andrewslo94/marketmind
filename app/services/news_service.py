@@ -19,6 +19,8 @@ Public functions
 get_company_news(ticker, days=7) -> CacheResult, .value = list of article dicts
 get_portfolio_news(tickers, days=7) -> (articles, meta)  merged, de-duplicated,
                                        newest first; meta says what failed
+get_market_news(category="general") -> CacheResult, .value = latest market-wide
+                                       articles (Reuters, CNBC, ...), newest first
 """
 import logging
 from datetime import date, datetime, timedelta, timezone
@@ -36,6 +38,7 @@ BASE_URL = "https://finnhub.io/api/v1"
 NEWS_TTL = 30 * 60  # 30 minutes: news doesn't need to be fresher for research
 TIMEOUT = 15  # seconds before we give up on a request
 MAX_PER_TICKER = 40  # keep the cache entries and the page a sensible size
+MAX_MARKET = 100  # Finnhub returns about 100 general-news articles
 
 
 class NewsError(Exception):
@@ -74,17 +77,11 @@ def _normalize(raw: dict, ticker: str) -> Optional[dict]:
     }
 
 
-def _fetch_company_news(ticker: str, days: int) -> list[dict]:
-    """One real call to Finnhub."""
-    today = date.today()
-    params = {
-        "symbol": ticker,
-        "from": (today - timedelta(days=days)).isoformat(),
-        "to": today.isoformat(),
-    }
+def _finnhub_get(path: str, params: dict) -> list:
+    """GET a Finnhub endpoint that returns a JSON list; turn every failure into NewsError."""
     try:
         resp = requests.get(
-            f"{BASE_URL}/company-news",
+            f"{BASE_URL}/{path}",
             params=params,
             headers={"X-Finnhub-Token": _api_key()},
             timeout=TIMEOUT,
@@ -99,13 +96,40 @@ def _fetch_company_news(ticker: str, days: int) -> list[dict]:
     if resp.status_code != 200:
         raise NewsError(f"Finnhub error {resp.status_code}")
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError:
+        raise NewsError("Unexpected response from Finnhub") from None
     if not isinstance(data, list):
         raise NewsError("Unexpected response from Finnhub")
+    return data
 
+
+def _fetch_company_news(ticker: str, days: int) -> list[dict]:
+    """One real call to Finnhub."""
+    today = date.today()
+    params = {
+        "symbol": ticker,
+        "from": (today - timedelta(days=days)).isoformat(),
+        "to": today.isoformat(),
+    }
+    data = _finnhub_get("company-news", params)
     articles = [a for a in (_normalize(raw, ticker) for raw in data) if a]
     articles.sort(key=lambda a: a["published_at"] or "", reverse=True)
     return articles[:MAX_PER_TICKER]
+
+
+def _fetch_market_news(category: str) -> list[dict]:
+    """One real call to Finnhub's market-wide news (no ticker)."""
+    data = _finnhub_get("news", {"category": category})
+    articles = [a for a in (_normalize(raw, None) for raw in data) if a]
+    articles.sort(key=lambda a: a["published_at"] or "", reverse=True)
+    return articles[:MAX_MARKET]
+
+
+def get_market_news(category: str = "general") -> CacheResult:
+    """Cached general market news. Raises NewsError only if nothing is cached."""
+    return get_or_fetch(f"news:market:{category}", NEWS_TTL, lambda: _fetch_market_news(category))
 
 
 def get_company_news(ticker: str, days: int = 7) -> CacheResult:

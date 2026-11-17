@@ -337,3 +337,29 @@ Phase 1 complete.
 - Calculation rules (month arithmetic across year ends, 12-month change, monthly change, gaps never bridged, formats, sparkline geometry incl. staircase).
 - **Cross-checked our arithmetic against FRED's own transformations:** 12-month change for CPIAUCSL and CPILFESL vs `units=pc1` (15 months each) and payroll change vs `units=chg` (17 months): worst difference 0.0000.
 - Live: 6/6 cards; cold load 2.3 s, warm 10 ms. Missing key → "Data unavailable: FRED_API_KEY is not set in .env" with the rest of the page intact. Key never in page HTML. Other pages still 200. Desktop and 390 px phone screenshots checked.
+
+---
+
+## 2026-11-17 — Phase 5C: Market developments (topic detection + sector impact)
+
+**Before starting:** Logan committed 5B and said "Start 5c". No install.
+
+**Probing first:** Finnhub general news returned 100 articles (Reuters 74, CNBC 26) covering about 36 hours, all with summaries and none tagged with tickers. A first draft of topic keywords matched only 25 of 100. The misses shaped the final map: "ahead of Nvidia results" (earnings), "Russian drone attack" and "tanker attacks" (geopolitics), "US retail sales increase" (no topic, so "employment" became **Jobs & consumer spending**). A bare "war" would also catch "trade war", so topics can list phrases to ignore.
+
+**What we built**
+- `app/services/topic_map.py` (new, **the map we write together**; pure data, meant to be read and edited): 8 topics (interest rates & central banks, inflation, jobs & consumer spending, tariffs & trade, oil & commodities, corporate earnings, technology & AI, geopolitics & conflict). Each has keywords, exclusions, why it matters, what to monitor, and **two opposite scenarios** (e.g. rates falling vs rising), each with direction phrases and the sectors that could see potential positive or negative implications, with example companies. 45 example companies, each filed under its own sector. Direction phrases are generated from subject × verb lists in both word orders (`moves(["oil"], "up")` → "oil rises", "rising oil", …): 3,888 phrases from a few short lists.
+- `app/services/market_news.py` (new): normalizes text, compiles each topic's keywords and each scenario's phrases into **one combined regex** (fast), classifies articles (one keyword in the headline, or two different ones in the summary), detects direction by counting articles per scenario (a scenario "leads" with more articles and at least 2× the other; otherwise "mixed" or "none", and both scenarios are shown), spots example companies named in the text, and orders each topic's articles most-on-topic first. Earnings uses "read-through": its sector lines come from the companies named in the coverage.
+- `app/services/news_service.py`: one shared `_finnhub_get` helper (same error handling for company and market news; also catches non-JSON replies now) and `get_market_news()` (cached 30 min).
+- `app/routes/market.py`: `/market/developments`. `app/templates/market/developments.html` (new): banner separating **Verified facts** from **Interpretation**, topic chips (and which topics have no coverage), one card per topic with facts on the left (headlines, publisher, time, matched keywords, companies named) and a dashed interpretation panel on the right (why it matters, direction + the exact words matched, sector scenarios with example companies linking to their stock pages, opposite scenario collapsed, what to monitor), then the full headline feed with topic tags. `index.html`: Overview / Developments tabs. `style.css`: tabs, chips, panels.
+
+**Problems and fixes**
+- "Fed cuts rates" matched nothing: keywords had "the fed" but not "fed", because "fed" is also a verb. Added "fed" plus verb exclusions ("fed into", "fed up", …); spot-checked both directions.
+- Sort tie-break ordered equal-coverage topics oldest-first. Fixed with two stable sorts.
+- Cards led with the newest story, which put an off-topic "AI exam cheating" story first. Now most-matched-keywords first: e.g. "US to curb China's access to AI chips".
+- Screenshot tooling: `sips --cropOffset 0 0` is ignored (it center-crops); offsets of 1 work.
+
+**Testing**
+- Map consistency (every sector valid, every example company under its own sector, aliases unique). Nine handwritten headlines: correct topics and directions, "airline" isn't AI, "election results" isn't earnings, "trade war" isn't geopolitics; mixed and no-signal cases.
+- Live: 37 of 100 articles matched; six topic cards (geopolitics 12 leaning "tensions rising" 6–0, oil 10 mixed 1–1, tech & AI 9, earnings 6 naming NVDA, rates 4, jobs 1); no coverage for inflation or trade. Page renders, example-company links open stock pages, tabs on both Markets pages, News page unchanged after the refactor ("Showing 40 of 40"), missing key → "Data unavailable". Desktop and phone screenshots checked.
+
+**Known limits (shown on the page):** keyword rules can't read negation ("no rate cut") or context, so every signal lists its matched words; sector effects are general textbook relationships, not predictions.
