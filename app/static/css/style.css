@@ -256,6 +256,24 @@ body {
 .form-select { background-color: var(--mm-bg); border-color: var(--mm-border); color: var(--mm-text); }
 .form-select:focus { border-color: var(--mm-accent); box-shadow: 0 0 0 0.2rem rgba(34, 197, 94, 0.2); }
 
+/* ---- Market overview (5A) ---- */
+.mm-group-note { font-size: 0.72rem; color: var(--mm-muted); }
+.mm-stat-change { font-size: 0.9rem; font-weight: 600; margin-top: 0.15rem; }
+.mm-row-sub { font-size: 0.72rem; color: var(--mm-muted); line-height: 1.35; }
+.mm-row-sub.mm-gain { color: var(--mm-accent); }
+.mm-row-sub.mm-loss { color: var(--mm-negative); }
+.mm-table-compact td, .mm-table-compact th { padding: 0.55rem 0.9rem; }
+.mm-num { font-variant-numeric: tabular-nums; }
+.mm-line-key { display: inline-block; width: 16px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 0.5rem; }
+.mm-chart-loading { opacity: 0.45; transition: opacity 0.15s ease; }
+/* Keep tile values aligned when a name wraps to two lines. */
+.mm-tiles .mm-stat-label { min-height: 3em; }
+/* Bootstrap colors every table cell with `.table > :not(caption) > * > *`,
+   which beat .mm-gain/.mm-loss on <td> (dashboard P/L columns too).
+   These selectors are more specific, so direction colors apply to cells. */
+.table > :not(caption) > * > .mm-gain { color: var(--mm-accent); }
+.table > :not(caption) > * > .mm-loss { color: var(--mm-negative); }
+
 /* ---- Footer ---- */
 .mm-footer {
     background: var(--mm-surface);

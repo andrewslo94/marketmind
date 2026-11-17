@@ -269,3 +269,39 @@ Phase 1 complete.
 - Live page (AAPL + MSFT): 76 of 76 with no filters; ticker=AAPL → 40; sentiment=negative → 20 and every badge on the page is negative; three combined filters → 25 with "3 filters active"; nonsense keyword → 0 with the no-match state; garbage parameters → 200 with no filters active.
 
 **Phase 4 is complete:** company news → sentiment with reasons → extractive summaries + implications → filters.
+
+---
+
+## 2026-11-17 — Phase 5A: Market Overview (indexes, Treasury yields, commodities)
+
+**Before starting:** Logan added `FRED_API_KEY` to `.env` (for 5B). Verified without printing it: 32 lowercase letters/digits, git-ignored, and a live test call returned the latest Fed funds rate (3.88% for October 2026).
+
+**Probing the data first (measured, not assumed)**
+- All 17 instruments return quotes from Yahoo via `Ticker.info`: indexes come back as `quoteType` INDEX, commodities as FUTURE. A cold load of all 17 takes about 4.7 s; after that the 15-minute cache serves them instantly.
+- Yahoo's CBOE Treasury-yield indexes are in **percent** (^TNX 5.107 = 5.107%). Cross-checked against FRED's official series: DTB3 4.13 / DGS5 4.98 / DGS10 5.15 / DGS30 5.47 (Nov 13) versus Yahoo 4.143 / 4.907 / 5.107 / 5.461 (Nov 17 live), within 0.08 percentage point across two trading days.
+- Different exchanges report different quote times (S&P 500 11:38 ET, Russell 2000 11:23 ET; Nikkei last traded 1:45 AM ET), so every row shows its own time.
+
+**What we built**
+- `app/services/market_data.py`: `get_market_quote(symbol)` (cache key `mquote:`) accepts INDEX and FUTURE; `_fetch_quote` gained an `allowed_types` parameter. `get_quote` still accepts only stocks/ETFs, so an index can't be added as a holding.
+- `app/services/market_overview.py`: instrument list in four groups (U.S. indexes + VIX, global indexes, Treasury yields, commodities), unit-aware formatting (indexes in points; yields in percent with daily change in **basis points**, because a percent change of a yield is easy to misread; commodities in dollars per unit, with the futures contract month when the provider names one), session labels, the **10-year minus 13-week spread** (a calculation; its explanatory note is labeled interpretation), and `index_performance(range)` = percent change since the first close of the period.
+- `app/routes/market.py`: `market` blueprint, `/market/` page and `/market/performance.json?range=` (1M, 3M, 6M, 1Y, 5Y), both login-required.
+- `app/templates/market/index.html`: provenance banner, U.S. index tiles, three compact tables, yield spread + interpretation box, the performance chart with its period control above it, a table view, and unit footnotes.
+- `app/static/js/market_chart.js`: plotly.js line chart. Hookups: blueprint registered, "Markets" nav link, CSS.
+
+**Chart decisions (dataviz guidance + measured checks)**
+- Percent change since the start of the period puts indexes at very different levels (S&P ≈ 7,300, Russell ≈ 2,700) on one axis, with no second axis.
+- Ran the palette validator (via macOS's built-in JavaScriptCore) against our card background `#121826`. Four line colors passed the adjacent-pair check but failed the every-pair check (orange vs yellow: ΔE 10.6 normal vision, 4.8 deuteranopia). Lines cross freely, so the chart shows **three** indexes with distinct stories (S&P 500 large companies, Nasdaq tech-heavy, Russell 2000 small companies), which pass every check. The Dow keeps its tile.
+- Legend always; end labels only when line ends are ≥ 18 px apart and the chart is ≥ 640 px wide (otherwise legend + table carry the names, never nudged labels); end-dots with a ring in the card color; table view built with `textContent`; the old chart stays dimmed while a new period loads; legend clicking disabled (hiding a line would orphan its dot and label).
+
+**Visual testing in headless Chrome (first time we could see a page)**
+- Rendered the real page HTML with live chart data and screenshotted desktop, 5Y, and a true 390 px phone view (Chrome won't make a window under ~500 px, so the phone view was rendered inside a 390 px iframe). Found and fixed:
+  1. Empty strip on the right of the chart: Plotly stretched the axis to fit data-anchored labels, and also pads 5% wherever there are dot markers. Labels are now anchored to the plot edge, the x range is set to the first/last date, and the end-dots draw over the edge (`cliponaxis: false`).
+  2. **Gain/loss colors on table cells were being overridden by Bootstrap** (`.table > :not(caption) > * > *` beats `.mm-gain`). This also affected the Portfolio dashboard's Today and Unrealized P/L columns since 3C, which showed white instead of green/red. Fixed with more specific selectors; before/after dashboard screenshots confirm.
+  3. Long tile names wrapped and misaligned the numbers → two-line label height; card notes moved under titles.
+  4. Phone: the table's Change column was pushed off-screen → moved next to the name, kept on one line.
+- One false alarm: a screenshot showed the wrong period button highlighted. The DOM showed the correct state; the screenshot had frozen Bootstrap's 0.15 s fade. Later screenshots disable transitions.
+
+**Testing**
+- Unit rules (bps, $, points, "Data unavailable", direction at display precision); unknown symbol → "Data unavailable"; spread equals 10-yr minus 13-wk; 17/17 instruments live; every chart period returns three series starting at 0% with change matching start/end closes; bad period → 400; logged-out → redirect; quote-type separation both ways; Home, Portfolio, News, Stock, and Add pages still 200.
+
+**Known follow-up:** the Home page still labels Portfolio, News, and Market Intelligence as "Planned" (unchanged since Phase 1B). Fix during Phase 8 polish.

@@ -16,6 +16,8 @@ Public functions
 ----------------
 get_quote(ticker)            -> CacheResult whose .value is a quote dict (or None if unknown ticker)
 get_quotes([tickers])        -> {ticker: CacheResult}
+get_market_quote(symbol)     -> like get_quote, for indexes (^GSPC), Treasury-yield
+                                indexes (^TNX) and futures (CL=F) on the Market page
 get_history(ticker, "1M")    -> CacheResult whose .value is a list of OHLCV rows
 history_dataframe(result)    -> pandas DataFrame built from a get_history() result
 ticker_exists(ticker)        -> True / False / None (None = couldn't verify right now)
@@ -52,6 +54,9 @@ HISTORY_RANGES = {
 
 # Only these instrument types are accepted when adding a holding.
 SUPPORTED_QUOTE_TYPES = {"EQUITY", "ETF"}
+# The Market Overview page shows indexes (including the CBOE Treasury-yield
+# indexes such as ^TNX) and futures contracts (CL=F crude oil, GC=F gold).
+MARKET_QUOTE_TYPES = {"INDEX", "FUTURE"}
 
 
 class MarketDataError(Exception):
@@ -83,10 +88,11 @@ def normalize_ticker(ticker: str) -> str:
 
 
 # ---------- quotes ----------
-def _fetch_quote(ticker: str) -> Optional[dict]:
+def _fetch_quote(ticker: str, allowed_types=SUPPORTED_QUOTE_TYPES) -> Optional[dict]:
     """
-    One real call to Yahoo. Returns None when the symbol is unknown, a quote
-    dict when it is known, and raises MarketDataError on provider trouble.
+    One real call to Yahoo. Returns None when the symbol is unknown (or not
+    one of allowed_types), a quote dict when it is known, and raises
+    MarketDataError on provider trouble.
     """
     try:
         yt = yf.Ticker(ticker)
@@ -96,7 +102,7 @@ def _fetch_quote(ticker: str) -> Optional[dict]:
 
     price = _num(info.get("regularMarketPrice"))
     quote_type = info.get("quoteType")
-    if price is None or quote_type not in SUPPORTED_QUOTE_TYPES:
+    if price is None or quote_type not in allowed_types:
         # Yahoo answers with an almost-empty dict for unknown symbols.
         return None
 
@@ -137,6 +143,20 @@ def get_quote(ticker: str) -> CacheResult:
     """Cached quote. result.value is a dict, or None for an unknown symbol."""
     ticker = normalize_ticker(ticker)
     return get_or_fetch(f"quote:{ticker}", QUOTE_TTL, lambda: _fetch_quote(ticker))
+
+
+def get_market_quote(symbol: str) -> CacheResult:
+    """
+    Cached quote for a market instrument: a stock index (^GSPC), a CBOE
+    Treasury-yield index (^TNX; its value is the yield in percent), or a
+    futures contract (CL=F). Kept separate from get_quote(), which only
+    accepts stocks and ETFs because it validates portfolio holdings.
+    Same 15-minute cache, under its own key prefix.
+    """
+    symbol = normalize_ticker(symbol)
+    return get_or_fetch(
+        f"mquote:{symbol}", QUOTE_TTL, lambda: _fetch_quote(symbol, MARKET_QUOTE_TYPES)
+    )
 
 
 def get_quotes(tickers) -> dict[str, CacheResult]:

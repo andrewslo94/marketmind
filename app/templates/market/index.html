@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Markets{% endblock %}
+
+{% block content %}
+{# ---- Small reusable pieces (macros) ---- #}
+{% macro arrow(r) %}{{ "▲" if r.direction == "up" else ("▼" if r.direction == "down" else "●") }}{% endmacro %}
+{% macro dir_class(r) %}{{ "mm-gain" if r.direction == "up" else ("mm-loss" if r.direction == "down" else "mm-muted") }}{% endmacro %}
+{% macro row_sub(r) -%}
+    {% if r.contract %}{{ r.contract }} · {% endif %}{{ r.market_time|et_time if r.market_time else "time unavailable" }}{% if r.session %} · {{ r.session }}{% endif %}{% if r.stale %} · stale{% endif %}
+{%- endmacro %}
+
+{% set m = ov.meta %}
+<div class="mb-3">
+    <p class="mm-eyebrow mb-1">Section C</p>
+    <h1 class="h3 mb-0">Market overview</h1>
+</div>
+
+{# ---- Provenance banner ---- #}
+<div class="mm-data-note mb-4 {% if m.stale or m.unavailable %}is-warn{% endif %}">
+    <span class="badge mm-badge-delayed">Delayed data</span>
+    <span>Source: {{ source }}.</span>
+    {% if m.latest_fetch %}
+    <span>Refreshed from provider {{ m.latest_fetch|et_time }}{% if m.oldest_fetch and m.oldest_fetch != m.latest_fetch %} (oldest {{ m.oldest_fetch|et_time }}){% endif %}; quotes are cached for 15 minutes.</span>
+    {% endif %}
+    <span>Exchanges report on different schedules and delays, so each row shows its own quote time (ET) and session.</span>
+    {% if m.stale %}<span><strong>Provider unreachable:</strong> some values are the last cached quotes.</span>{% endif %}
+    {% if m.unavailable %}<span><strong>Data unavailable:</strong> {{ m.unavailable|join(", ") }}.</span>{% endif %}
+</div>
+
+{# ---- U.S. indexes: stat tiles ---- #}
+{% for g in ov.groups if g.key == "us" %}
+<div class="d-flex justify-content-between align-items-baseline mm-section-title">
+    <h2 class="h6 fw-semibold mb-0">{{ g.title }}</h2>
+    <span class="mm-group-note">{{ g.note }}</span>
+</div>
+<div class="row row-cols-2 row-cols-md-3 row-cols-xl-5 g-3 mb-4 mm-tiles">
+    {% for r in g.rows %}
+    <div class="col">
+        <div class="mm-card mm-stat h-100">
+            <div class="mm-stat-label">{{ r.name }}</div>
+            {% if r.available %}
+            <div class="mm-stat-value">{{ r.value_text }}</div>
+            <div class="mm-stat-change {{ dir_class(r) }}">
+                {{ arrow(r) }} {{ r.change_text }}{% if r.change_pct_text != "—" %} ({{ r.change_pct_text }}){% endif %}
+            </div>
+            <div class="mm-stat-note mt-1">{{ row_sub(r) }}</div>
+            {% else %}
+            <div class="mm-stat-value mm-muted">—</div>
+            <div class="mm-stat-note">Data unavailable</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+{# ---- Global indexes, Treasury yields, commodities: compact tables ---- #}
+<div class="row g-3 mb-4">
+    {% for g in ov.groups if g.key != "us" %}
+    <div class="col-lg-4">
+        <div class="mm-card p-0 h-100">
+            <div class="px-3 pt-3 pb-1">
+                <h2 class="h6 fw-semibold mb-0">{{ g.title }}</h2>
+                <div class="mm-group-note">{{ g.note }}</div>
+            </div>
+            <table class="table mm-table mm-table-compact align-middle mb-0">
+                <tbody>
+                    {% for r in g.rows %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ r.name }}</div>
+                            <div class="mm-row-sub">{{ row_sub(r) if r.available else "Data unavailable" }}</div>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <div class="fw-semibold mm-num">{{ r.value_text if r.available else "—" }}</div>
+                            {% if r.unit and r.available %}<div class="mm-row-sub">{{ r.unit }}</div>{% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            {% if r.available %}
+                            <div class="fw-semibold small {{ dir_class(r) }}">{{ arrow(r) }} {{ r.change_text }}</div>
+                            {% if r.change_pct_text != "—" %}<div class="mm-row-sub {{ dir_class(r) }}">{{ r.change_pct_text }}</div>{% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if g.key == "yields" %}
+            {# Spread = a calculation from two quotes above (fact); the note is interpretation. #}
+            <div class="px-3 pb-3 pt-2">
+                <div class="small">
+                    <span class="mm-fact-label">Calculated</span>10-year minus 13-week:
+                    <strong>{{ ov.spread.text }}</strong>
+                </div>
+                {% if ov.spread.note %}
+                <div class="mm-interp mt-2">
+                    <span class="mm-interp-label">Interpretation</span>
+                    <span class="mm-interp-why">{{ ov.spread.note }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{# ---- Performance: range control above the chart it scopes ---- #}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mm-section-title">
+    <div>
+        <h2 class="h6 fw-semibold mb-0">U.S. index performance</h2>
+        <span class="mm-group-note">Percent change since the start of the period: large companies (S&amp;P 500), tech-heavy (Nasdaq Composite), small companies (Russell 2000).</span>
+    </div>
+    <div id="perfRanges" class="btn-group btn-group-sm mm-range-group" role="group" aria-label="Performance period">
+        {% for r in ranges %}
+        <button type="button" class="btn btn-outline-secondary {% if r == default_range %}active{% endif %}"
+                data-range="{{ r }}" aria-pressed="{{ 'true' if r == default_range else 'false' }}">{{ r }}</button>
+        {% endfor %}
+    </div>
+</div>
+<div class="mm-card mb-3">
+    <div id="perfChart" data-url="{{ url_for('market.performance_json') }}" data-default="{{ default_range }}"
+         role="img" aria-label="Line chart of U.S. index performance. The same numbers are in the table below the chart."></div>
+    <div class="table-responsive mt-2">
+        <table id="perfTable" class="table mm-table mm-table-compact align-middle mb-0">
+            <thead>
+                <tr><th>Index</th><th class="text-end">Change</th><th class="text-end">Start</th><th class="text-end">Latest</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <div id="perfNote" class="mm-muted small mt-2">Loading chart…</div>
+</div>
+
+{# ---- Footnotes: units and how to read colors ---- #}
+<p class="small mm-muted mb-1">
+    Index values are in points. Treasury yields are CBOE yield indexes in percent; their daily change is shown in
+    basis points (1 bp = 0.01 percentage point). Commodities are front-month futures contracts in U.S. dollars, and
+    the contract rolls to the next month as each one expires.
+</p>
+<p class="small mm-muted mb-0">
+    Green and red show direction only, not whether a move is good or bad. Figures are for research and education;
+    MarketMind never recommends buying or selling.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
+<script src="{{ url_for('static', filename='js/market_chart.js') }}"></script>
+{% endblock %}
