@@ -37,3 +37,5 @@ class Config:
     # --- External API keys (each loaded from .env; None if not set) ---
     # Finnhub: company + market news. Free tier, personal use, 60 calls/min.
     FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
+    # FRED (St. Louis Fed): U.S. economic indicators. Free key, 120 calls/min.
+    FRED_API_KEY = os.environ.get("FRED_API_KEY")

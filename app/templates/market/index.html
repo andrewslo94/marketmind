@@ -106,6 +106,58 @@
     {% endfor %}
 </div>
 
+{# ---- U.S. economic indicators (FRED) ---- #}
+{% set e = econ %}
+<div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mm-section-title">
+    <h2 class="h6 fw-semibold mb-0">U.S. economic indicators</h2>
+    <span class="mm-group-note">Official statistics · each value describes a past month, quarter, or day</span>
+</div>
+<div class="mm-data-note mb-3 {% if e.meta.stale or e.meta.errors %}is-warn{% endif %}">
+    <span class="badge mm-badge-delayed">Official data</span>
+    <span>Source: {{ e.source }}; each card names the agency that publishes the statistic.</span>
+    {% if e.meta.fetched_at %}
+    <span>Fetched {{ e.meta.fetched_at|et_time }}; cached for 6 hours.</span>
+    {% endif %}
+    {% if e.meta.stale %}<span><strong>FRED unreachable:</strong> showing cached values.</span>{% endif %}
+    {% for err in e.meta.errors %}<span><strong>Data unavailable:</strong> {{ err }}.</span>{% endfor %}
+    <span class="mm-fred-attrib">{{ e.attribution }}</span>
+</div>
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 mb-4">
+    {% for it in e.cards %}
+    <div class="col">
+        <div class="mm-card mm-stat h-100 d-flex flex-column">
+            <div class="mm-stat-label">{{ it.name }}</div>
+            <div class="mm-econ-measures">{{ it.measures }}</div>
+            {% if it.available %}
+            <div class="d-flex align-items-end justify-content-between gap-3 mt-2">
+                <div>
+                    <div class="mm-stat-value text-nowrap">{{ it.value_text }}</div>
+                    <div class="mm-stat-note">{{ it.period }}{% if it.calc_label %} · {{ it.calc_label }}{% endif %}</div>
+                </div>
+                {% if it.spark %}
+                {# Sparkline: muted line, latest point in blue. Hover a column for that period's value. #}
+                <svg class="mm-spark" viewBox="0 0 120 32" role="img" aria-label="{{ it.name }}: {{ it.spark.summary }}">
+                    <path class="mm-spark-line" d="{{ it.spark.path }}"/>
+                    <circle class="mm-spark-end" cx="{{ it.spark.end_x }}" cy="{{ it.spark.end_y }}" r="3.5"/>
+                    {% for b in it.spark.bands %}<rect class="mm-spark-hit" x="{{ b.x }}" y="0" width="{{ b.w }}" height="32"><title>{{ b.title }}</title></rect>{% endfor %}
+                </svg>
+                {% endif %}
+            </div>
+            {% if it.comparison %}<div class="mm-stat-note mt-1">{{ it.comparison }}</div>{% endif %}
+            {% if it.note %}<div class="mm-econ-note mt-1">Note: {{ it.note }}</div>{% endif %}
+            {% else %}
+            <div class="mm-stat-value mm-muted mt-2">—</div>
+            <div class="mm-stat-note">Data unavailable</div>
+            {% endif %}
+            <div class="mm-econ-source mt-auto pt-2">
+                {{ it.agency }}, via FRED:
+                {% for sid in it.series_ids %}<a href="{{ it.links[loop.index0] }}" target="_blank" rel="noopener noreferrer">{{ sid }} ↗</a>{% if not loop.last %}, {% endif %}{% endfor %}{% if it.stale %} · stale{% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
 {# ---- Performance: range control above the chart it scopes ---- #}
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mm-section-title">
     <div>

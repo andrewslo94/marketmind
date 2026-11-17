@@ -305,3 +305,35 @@ Phase 1 complete.
 - Unit rules (bps, $, points, "Data unavailable", direction at display precision); unknown symbol → "Data unavailable"; spread equals 10-yr minus 13-wk; 17/17 instruments live; every chart period returns three series starting at 0% with change matching start/end closes; bad period → 400; logged-out → redirect; quote-type separation both ways; Home, Portfolio, News, Stock, and Add pages still 200.
 
 **Known follow-up:** the Home page still labels Portfolio, News, and Market Intelligence as "Planned" (unchanged since Phase 1B). Fix during Phase 8 polish.
+
+---
+
+## 2026-11-17 — Phase 5B: U.S. economic indicators from FRED
+
+**Before starting:** Logan committed 5A and said "start 5B". No install (uses `requests`, already present).
+
+**About the provider (checked on FRED's own documentation pages)**
+- FRED = Federal Reserve Economic Data, run by the Federal Reserve Bank of St. Louis. It republishes official statistics: BLS (prices, jobs), BEA (GDP), Federal Reserve Board (policy rate). Free key.
+- **Rate limit: 120 requests per minute** (FRED errors page: "Up to 120 requests per minute are allowed before being served a 429 error code"). We make 7 calls, cached 6 hours.
+- **Terms of use require apps to display:** "This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis." Shown in the indicators banner.
+- Third-party copyrighted series need the owner's permission beyond personal use. Checked all 7 series' notes for "Copyright": none (they're U.S. government data).
+- **Security:** FRED only accepts the key as a URL parameter, so a raw network error message (which includes the URL) would contain the key. All errors are replaced with plain messages (`raise FredError(...) from None`) before they can reach logs, the cache, or the page. A test injects a failure whose message contains the key and confirms it appears nowhere.
+
+**What we built**
+- `config.py`: `FRED_API_KEY`.
+- `app/services/fred_service.py`: fetches observations (3 years) per series through the cache (`fred:<SERIES>`, 6 h); FRED's "." becomes `None` and is never filled in. Six indicator cards: CPI inflation and core inflation (**12-month change calculated from the price index**), unemployment rate (as published), jobs added (**monthly change in PAYEMS**, thousands), Fed funds target range (lower + upper limit, when the current range took effect and what it was before), real GDP growth (as published, annualized). Server-drawn SVG sparklines (2 years; 3 years for GDP; a staircase for the policy rate) that break at missing data, end in a blue dot, and have hover bands with native tooltips ("Sep 2026: 3.7%").
+- `app/routes/market.py`: passes `econ=build_indicators()` to the page.
+- `app/templates/market/index.html`: "U.S. economic indicators" section with an "Official data" banner, fetch time, the FRED notice, and six cards. Each card shows a one-line definition, the period, whether MarketMind calculated the value, the comparison with the previous period, notes, and the publishing agency with links to the official FRED series pages.
+- `style.css`: card and sparkline styles. Comparisons are neutral text, not green/red: whether rising unemployment or inflation is "good" is a judgment the app doesn't make.
+
+**What the data showed**
+- FRED has **no October 2025 value** for CPI, core CPI, and the unemployment rate, while payrolls are complete. The pattern (price survey and household survey missing, establishment survey present) matches the October–November 2025 federal government shutdown, when BLS could not collect those surveys. Consequence: October 2026's 12-month inflation can't be calculated, so the card shows September 2026 (the latest calculable month) with a note saying exactly why. FRED's own transformation agrees: its "percent change from year ago" is also missing for October 2026.
+
+**Problems and fixes**
+- `TypeError: 'builtin_function_or_method' object is not iterable` in the template: `econ.items` in Jinja finds the dictionary's built-in `.items()` method before the `"items"` key. Renamed the key to `cards`.
+- Headless-Chrome screenshot showed "3.75%–4.00%" wrapping next to its sparkline → compact form "3.75–4.00%", kept on one line.
+
+**Testing**
+- Calculation rules (month arithmetic across year ends, 12-month change, monthly change, gaps never bridged, formats, sparkline geometry incl. staircase).
+- **Cross-checked our arithmetic against FRED's own transformations:** 12-month change for CPIAUCSL and CPILFESL vs `units=pc1` (15 months each) and payroll change vs `units=chg` (17 months): worst difference 0.0000.
+- Live: 6/6 cards; cold load 2.3 s, warm 10 ms. Missing key → "Data unavailable: FRED_API_KEY is not set in .env" with the rest of the page intact. Key never in page HTML. Other pages still 200. Desktop and 390 px phone screenshots checked.
