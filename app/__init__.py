@@ -57,4 +57,9 @@ def create_app(config_class=Config):
     app.register_blueprint(news_bp)
     app.register_blueprint(market_bp)
 
+    # Terminal commands, e.g. `flask --app run refresh-fundamentals` (app/cli.py).
+    from app.cli import register_cli
+
+    register_cli(app)
+
     return app

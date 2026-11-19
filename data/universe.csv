@@ -1,0 +1,65 @@
+ticker,name,sector,industry,financial_currency
+AAPL,Apple Inc.,Technology,Consumer Electronics,USD
+MSFT,Microsoft Corporation,Technology,Software - Infrastructure,USD
+NVDA,NVIDIA Corporation,Technology,Semiconductors,USD
+AMD,"Advanced Micro Devices, Inc.",Technology,Semiconductors,USD
+AVGO,Broadcom Inc.,Technology,Semiconductors,USD
+ANET,"Arista Networks, Inc.",Technology,Computer Hardware,USD
+GOOGL,Alphabet Inc.,Communication Services,Internet Content & Information,USD
+META,"Meta Platforms, Inc.",Communication Services,Internet Content & Information,USD
+NFLX,"Netflix, Inc.",Communication Services,Entertainment,USD
+DIS,The Walt Disney Company,Communication Services,Entertainment,USD
+VZ,Verizon Communications Inc.,Communication Services,Telecom Services,USD
+AMZN,"Amazon.com, Inc.",Consumer Discretionary,Internet Retail,USD
+HD,"The Home Depot, Inc.",Consumer Discretionary,Home Improvement Retail,USD
+NKE,"NIKE, Inc.",Consumer Discretionary,Footwear & Accessories,USD
+GM,General Motors Company,Consumer Discretionary,Auto Manufacturers,USD
+F,Ford Motor Company,Consumer Discretionary,Auto Manufacturers,USD
+DHI,"D.R. Horton, Inc.",Consumer Discretionary,Residential Construction,USD
+LEN,Lennar Corporation,Consumer Discretionary,Residential Construction,USD
+BKNG,Booking Holdings Inc.,Consumer Discretionary,Travel Services,USD
+PG,The Procter & Gamble Company,Consumer Staples,Household & Personal Products,USD
+KO,The Coca-Cola Company,Consumer Staples,Beverages - Non-Alcoholic,USD
+WMT,Walmart Inc.,Consumer Staples,Discount Stores,USD
+PEP,"PepsiCo, Inc.",Consumer Staples,Beverages - Non-Alcoholic,USD
+COST,Costco Wholesale Corporation,Consumer Staples,Discount Stores,USD
+XOM,ExxonMobil Holdings Corporation,Energy,Oil & Gas Integrated,USD
+CVX,Chevron Corporation,Energy,Oil & Gas Integrated,USD
+COP,ConocoPhillips,Energy,Oil & Gas E&P,USD
+SLB,SLB N.V.,Energy,Oil & Gas Equipment & Services,USD
+JPM,JPMorgan Chase & Co.,Financials,Banks - Diversified,USD
+BAC,Bank of America Corporation,Financials,Banks - Diversified,USD
+V,Visa Inc.,Financials,Credit Services,USD
+MA,Mastercard Incorporated,Financials,Credit Services,USD
+GS,"The Goldman Sachs Group, Inc.",Financials,Capital Markets,USD
+JNJ,Johnson & Johnson,Healthcare,Drug Manufacturers - General,USD
+UNH,UnitedHealth Group Incorporated,Healthcare,Healthcare Plans,USD
+LLY,Eli Lilly and Company,Healthcare,Drug Manufacturers - General,USD
+ABBV,AbbVie Inc.,Healthcare,Drug Manufacturers - General,USD
+MRK,"Merck & Co., Inc.",Healthcare,Drug Manufacturers - General,USD
+PFE,Pfizer Inc.,Healthcare,Drug Manufacturers - General,USD
+CAT,Caterpillar Inc.,Industrials,Farm & Heavy Construction Machinery,USD
+UNP,Union Pacific Corporation,Industrials,Railroads,USD
+BA,The Boeing Company,Industrials,Aerospace & Defense,USD
+DAL,"Delta Air Lines, Inc.",Industrials,Airlines,USD
+UAL,"United Airlines Holdings, Inc.",Industrials,Airlines,USD
+UPS,"United Parcel Service, Inc.",Industrials,Integrated Freight & Logistics,USD
+LMT,Lockheed Martin Corporation,Industrials,Aerospace & Defense,USD
+RTX,RTX Corporation,Industrials,Aerospace & Defense,USD
+NOC,Northrop Grumman Corporation,Industrials,Aerospace & Defense,USD
+LIN,Linde plc,Materials,Specialty Chemicals,USD
+FCX,Freeport-McMoRan Inc.,Materials,Copper,USD
+NUE,Nucor Corporation,Materials,Steel,USD
+STLD,"Steel Dynamics, Inc.",Materials,Steel,USD
+DOW,Dow Inc.,Materials,Chemicals,USD
+NEM,Newmont Corporation,Materials,Gold,USD
+PLD,"Prologis, Inc.",Real Estate,REIT - Industrial,USD
+O,Realty Income Corporation,Real Estate,REIT - Retail,USD
+EQIX,"Equinix, Inc.",Real Estate,REIT - Specialty,USD
+DLR,"Digital Realty Trust, Inc.",Real Estate,REIT - Specialty,USD
+AMT,American Tower Corporation,Real Estate,REIT - Specialty,USD
+NEE,"NextEra Energy, Inc.",Utilities,Utilities - Regulated Electric,USD
+DUK,Duke Energy Corporation,Utilities,Utilities - Regulated Electric,USD
+SO,The Southern Company,Utilities,Utilities - Regulated Electric,USD
+CEG,Constellation Energy Corporation,Utilities,Utilities - Independent Power Producers,USD
+VST,Vistra Corp.,Utilities,Utilities - Independent Power Producers,USD

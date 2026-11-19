@@ -391,3 +391,34 @@ Phase 1 complete.
 - One article → "weak"; two → "leans". Live: every topic's related numbers available (e.g. VIX 25.39, Brent $93.40, Fed range 3.75–4.00%, unemployment 4.1% Oct 2026). Page with holdings shows the panel, "You hold" badges, per-card holdings lines; a user without holdings sees an invitation instead. Portfolio, Overview, News, Stock pages unchanged. Desktop screenshots checked.
 
 **Phase 5 is complete:** market overview (indexes, yields, commodities), FRED economic indicators, market developments with topic detection, and sector impact connected to the user's portfolio.
+
+---
+
+## 2026-11-19 — Phase 6A: Research universe + hybrid fundamentals (FMP + Yahoo)
+
+**Before starting:** Logan created a free Financial Modeling Prep account and added `FMP_API_KEY` to `.env` (verified without printing it).
+
+**Checking the provider first**
+- FMP's own pages block automated reading, so free-plan limits came from summaries checked in November 2026 (250 requests/day, 500 MB per 30 days, up to 5 annual statements, legacy API for paid customers only) and from real calls.
+- The key works in an `apikey` **request header**, so it never appears in a URL. All 8 endpoints we need answered for Apple.
+- **Coverage test:** the free plan serves a fixed list of popular stocks. 21 of the 45 topic-map companies were covered; the rest returned HTTP 402 "not available under your current subscription". **None** of 24 Materials, Real Estate, and Utilities companies tried were covered. Yahoo had five years of statements with every needed line for blocked companies (NextEra, Prologis, Linde).
+- **Decision (Logan): option 1, hybrid.** FMP where covered, Yahoo otherwise, and MarketMind calculates every ratio itself. CLAUDE.md's tech-stack row updated.
+
+**Cross-checking the two providers before trusting the hybrid**
+- Line by line for Apple, Exxon, Coca-Cola, JPMorgan: revenue, net income, equity, current assets/liabilities, operating cash flow, capex, free cash flow **identical**. Operating income differed for Coca-Cola (8%) → stored, never scored. Total debt can differ a few percent (lease obligations counted differently). Banks' revenue and debt are defined completely differently by each provider (JPMorgan revenue $280B vs $182B).
+
+**What we built**
+- `data/universe.csv`: 64 companies, 4–9 in each of the 11 sectors (all 45 topic-map companies plus AI networking, data-center power, healthcare, payments, etc.). Name, sector, industry, and reporting currency were pulled from Yahoo, and every row was checked: an equity, priced in USD, statements in USD, in the intended sector.
+- `app/services/research_data.py`: `load_universe()` (validates the CSV), `get_fundamentals()` (FMP's three statements, or Yahoo's when FMP returns 402, hits its daily limit, or has no key; one normalized record of 5 annual years; cached 7 days), and `compute_metrics()`: 14 metrics by MarketMind's formulas (revenue growth 1-yr and 3-yr, net income growth, net margin, ROE, debt to equity, current ratio, free cash flow and its margin, profitable years, P/E, P/B, P/S, FCF yield), each with its formula, inputs, and a note when it isn't meaningful (net loss, negative equity, missing market value, non-USD). Banks and brokers (JPM, BAC, GS) use the 5 metrics that are comparable.
+- `app/cli.py` + registration in `app/__init__.py`: `flask --app run refresh-fundamentals [TICKERS...]` loads statements into the cache and prints a summary table, the source per company, and the FMP calls used. New concept: Flask CLI commands built with `click`.
+- `config.py`: `FMP_API_KEY`.
+
+**Problems and fixes**
+- "Profitable years" came out 5 of 5 from FMP but 4 of 4 from Yahoo for Apple (Yahoo lacked a 5th year of net income), so the metric depended on the provider. It now always looks at the latest 4 years.
+
+**Testing**
+- Universe: 64 rows, all 11 sectors, every topic-map company present with the same sector.
+- Formulas on a handmade company (all 14 metrics exact) plus net loss, negative equity, no market value, non-USD statements, bank, and empty cases.
+- **Same company from both providers:** Apple 14 of 14 metrics identical; Coca-Cola 14 of 14 identical except debt to equity (3.65%, lease accounting, disclosed in the metric's note); JPMorgan's 5 bank metrics identical.
+- No FMP key → Yahoo for everyone, 0 FMP calls.
+- Full run: 64 companies in 81 s, 31 from FMP and 33 from Yahoo, 0 failures, 116 FMP calls (≈205 of 250 used today including the checks). Repeat run: 0 s, 64/64 from cache, 0 FMP calls. Existing pages unchanged.

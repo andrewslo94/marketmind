@@ -39,3 +39,6 @@ class Config:
     FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
     # FRED (St. Louis Fed): U.S. economic indicators. Free key, 120 calls/min.
     FRED_API_KEY = os.environ.get("FRED_API_KEY")
+    # Financial Modeling Prep: company statements. Free plan: 250 calls/day,
+    # fixed list of covered symbols (others fall back to Yahoo statements).
+    FMP_API_KEY = os.environ.get("FMP_API_KEY")
