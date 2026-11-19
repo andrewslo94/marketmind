@@ -422,3 +422,30 @@ Phase 1 complete.
 - **Same company from both providers:** Apple 14 of 14 metrics identical; Coca-Cola 14 of 14 identical except debt to equity (3.65%, lease accounting, disclosed in the metric's note); JPMorgan's 5 bank metrics identical.
 - No FMP key → Yahoo for everyone, 0 FMP calls.
 - Full run: 64 companies in 81 s, 31 from FMP and 33 from Yahoo, 0 failures, 116 FMP calls (≈205 of 250 used today including the checks). Repeat run: 0 s, 64/64 from cache, 0 FMP calls. Existing pages unchanged.
+
+---
+
+## 2026-11-19 — Phase 6B: Research Confidence Score
+
+**Before starting:** Logan committed 6A (3093a47) and said "Start phase 6b". No install, no new key.
+
+**What we built**
+- `app/services/scoring.py` (new). Five categories, each 0–100, weighted 25/20/20/20/15:
+  - **Financial health** (statements): debt to equity, current ratio, net margin, free cash flow margin, revenue growth (3-yr average, else 1-yr), profitable years. Banks/brokers: return on equity, net income growth, profitable years.
+  - **Industry & market conditions**: the sector's label from Market developments (lean positive 75 · mixed/unclear 50 · lean negative 25; interpretation, so never 0 or 100) and the sector's 3-month price momentum vs the S&P 500 (average of the universe companies in that sector).
+  - **News & catalysts**: this week's company news (Finnhub, ≥ 3 articles): sentiment `50 + 50 × (positive − negative) ÷ total` and catalyst events from the Phase 4 implication rules (`50 + 50 × (positive − negative) ÷ catalyst articles`, ≥ 2 needed).
+  - **Valuation**: P/E, P/S, and free cash flow yield (banks: P/E, P/B) compared with the **median of the company's peers**, as a ratio (≤ 0.75× earns 100 … above 1.33× earns 0) or, for yields, a gap in percentage points.
+  - **Historical performance & risk**: 1-year return vs the S&P 500, annualized volatility, worst drop from a 1-year high (Yahoo daily closes, dividend-adjusted).
+- Every rule is a **band table at the top of the file** (`BANDS`, `SIGNAL_POINTS`, `WEIGHTS`, `OUTLOOK`). A category is the average of its sub-scores; **missing data is left out, never counted as zero**; weights rescale over the categories used, and fewer than 3 categories means no overall score. Outlook: ≥ 65 positive, ≥ 45 neutral, else negative. Key risks and strengths are plain sentences generated from the same numbers. The disclaimer ("not the probability of a profit, a price prediction, or a recommendation") is a constant shown with every result.
+- `app/cli.py` + registration: `flask --app run research-scores` (ranked table) and `--explain TICKER` (every sub-score with its measured value, points, the exact rule, and context such as the sector median). Fresh Finnhub calls are spaced 1.1 s apart to respect its 60 calls/minute.
+
+**Problems found by reading real breakdowns, and fixes**
+- **Percentile ranks were too coarse in small peer groups**: JPMorgan's valuation scored 0 because its P/E was 14.9 vs Goldman's 14.2 with only two other banks. Valuation now compares with the peer *median* (ratio bands), which grades how far from typical a company is: JPMorgan's P/E is 1.18× the other banks' median → 25, and the category notes "only 2 peers, treat as a rough guide".
+- **Growth bands were cliff-edged**: a 2.4% profit dip scored 0, the same as a collapse. Small declines (to −3%) now earn 25.
+- **A positive event was listed under risks**: NVIDIA's risks said "catalyst events: Product launch …; Analyst downgrade …". Positive and negative events are now kept apart: positive ones under strengths, negative under risks.
+- **Sector context mixed directions**: it now reads "negative: Geopolitics & conflict, Interest rates · unclear: Technology & AI, …".
+- Checked JPMorgan's 6 "security incident or outage" events: real stories (a vendor data breach, a banking outage, a cyberattack disclosure) plus two loosely tagged industry stories. Rule left as is.
+
+**Testing**
+- Unit tests on an invented 7-company world with hand-checkable answers: band edges, every health sub-score, the median comparison (a loss-maker is excluded from peers), the small-bank-group note, news formulas, too-few and unavailable news left out (4 of 5 categories, weights rescaled), outlook cut-offs, and every risk/strength sentence traced to its number.
+- Live, all 64 companies: first run 123 s (fresh news spaced for Finnhub), repeat 2 s from cache. 14 Positive · 44 Neutral · 6 Negative; scores 37–75, median 59; all 5 categories used for every company. Sector averages span 50–66, so no sector is favored by construction.
