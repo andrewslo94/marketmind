@@ -1,0 +1,56 @@
+{# Shared pieces for the Research pages. Imported with {% from ... import ... %}. #}
+
+{% macro outlook_badge(card, classes) %}
+{% if card.outlook %}<span class="badge mm-lean mm-lean-{{ classes.get(card.outlook, 'either') }}">{{ card.outlook }} research outlook</span>
+{% else %}<span class="badge mm-lean mm-lean-either">Not enough data</span>{% endif %}
+{% endmacro %}
+
+{% macro category_bars(card) %}
+{# One meter per category: blue fill on a lighter track, score on the right. #}
+{% set short = {"health": "Financial health", "industry": "Industry & market", "news": "News & catalysts",
+                "valuation": "Valuation", "performance": "Performance & risk"} %}
+<div class="mm-cat-bars">
+    {% for c in card.categories %}
+    <div class="mm-cat-row" title="{{ c.name }}: {{ '%.0f'|format(c.score) if c.score is not none else 'left out: ' ~ (c.note or 'no data') }}">
+        <span class="mm-cat-name">{{ short.get(c.key, c.name) }} <span class="mm-row-sub">{{ c.weight }}%</span></span>
+        <span class="mm-bar-track" aria-hidden="true"><span class="mm-bar-fill" style="width: {{ c.score or 0 }}%"></span></span>
+        <span class="mm-cat-score">{{ "%.0f"|format(c.score) if c.score is not none else "—" }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro concentration(check, sector, threshold) %}
+{% if check.level == "heavy" %}
+<div class="mm-conc mm-conc-heavy" role="note">
+    <span class="mm-conc-label">⚠ Concentration check</span>
+    {{ "%.0f"|format(check.pct) }}% of your portfolio's value is already in {{ sector }} ({{ check.tickers|join(", ") }}),
+    at or above the {{ threshold|int }}% level MarketMind flags as heavy. Adding another {{ sector }} company would increase that concentration.
+</div>
+{% elif check.level == "some" %}
+<div class="mm-conc" role="note">
+    <span class="mm-conc-label">Concentration check</span>
+    {{ "%.0f"|format(check.pct) }}% of your portfolio's value is in {{ sector }} ({{ check.tickers|join(", ") }}), below the {{ threshold|int }}% level flagged as heavy.
+</div>
+{% elif check.level == "none" %}
+<div class="mm-conc" role="note">
+    <span class="mm-conc-label">Concentration check</span>
+    You don't hold any {{ sector }} stocks directly{% if not check.funds %}, so this would be a new sector for your portfolio{% endif %}.
+</div>
+{% else %}
+<div class="mm-conc" role="note"><span class="mm-conc-label">Concentration check</span> Add holdings to see how this company would change your sector mix.</div>
+{% endif %}
+{% if check.funds %}<div class="mm-row-sub mt-1">Funds you hold ({{ check.funds|join(", ") }}) aren't split by sector, so your real exposure may be higher.</div>{% endif %}
+{% endmacro %}
+
+{% macro live_price(quote) %}
+{% if quote and quote.price is not none %}
+<span class="fw-semibold">{{ quote.price|money }}</span>
+<span class="mm-row-sub"> · {{ quote.market_time|fromiso|et_time if quote.market_time else "time unavailable" }} ·
+    <span class="badge mm-badge-delayed">Delayed</span> Yahoo Finance</span>
+{% else %}<span class="mm-row-sub">Price: Data unavailable</span>{% endif %}
+{% endmacro %}
+
+{% macro disclaimer_box(text) %}
+<div class="mm-disclaimer mb-4" role="note"><strong>What the score means.</strong> {{ text }}</div>
+{% endmacro %}

@@ -29,17 +29,20 @@ Public functions
 ----------------
 build_context(companies, news_pause=0) -> Context   (shared data: peers, sector signals, prices, news)
 score_company(company, ctx)            -> ScoreCard
-score_universe(news_pause=0)           -> (ScoreCards best first, Context)
+score_universe(news_pause=0, save=False) -> (ScoreCards best first, Context); save=True stores the batch
+load_snapshot()                        -> the saved batch for the Research pages, or None
+explain_opportunity(card, rank, total, topics) -> "why identified" sentences
 """
 import logging
 import math
 import statistics
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from app.services import research_data as rd
+from app.services.cache import peek, put
 from app.services.implications import implications_for_article
 from app.services.market_data import get_history, get_quote
 from app.services.market_news import build_developments, sector_impact
@@ -480,6 +483,10 @@ def _risks_and_strengths(company, m, cats, ctx):
         if roe is not None and roe >= 0.15:
             strengths.append(f"High return on equity for a bank: {roe * 100:.1f}%.")
 
+    nig = m["net_income_growth"].value
+    if nig is not None and nig <= -0.10:
+        risks.append(f"Net income fell {abs(nig) * 100:.1f}% in the latest fiscal year.")
+
     py = m["profitable_years"]
     if py.value is not None and py.value == py.inputs.get("years_available") and py.value >= 3:
         strengths.append(f"Profitable in each of the last {int(py.value)} years.")
@@ -560,9 +567,61 @@ def score_company(company, ctx: Context) -> ScoreCard:
     )
 
 
-def score_universe(news_pause: float = 0.0):
+def score_universe(news_pause: float = 0.0, save: bool = False):
     companies = rd.load_universe()
     ctx = build_context(companies, news_pause=news_pause)
     cards = [score_company(c, ctx) for c in companies]
     cards.sort(key=lambda c: (c.overall is None, -(c.overall or 0)))
+    if save:
+        save_snapshot(cards, ctx)
     return cards, ctx
+
+
+# ---------------------------------------------------------------------------
+# The saved batch the Research pages read. Scoring all 64 companies needs about
+# 64 news calls (Finnhub allows 60 a minute), so pages never score on the fly;
+# `flask --app run research-scores` calculates and saves the batch.
+# ---------------------------------------------------------------------------
+SNAPSHOT_KEY = "research:snapshot"
+SNAPSHOT_STALE_AFTER = timedelta(hours=24)
+
+
+def save_snapshot(cards, ctx) -> datetime:
+    rows = []
+    for card in cards:
+        row = asdict(card)  # plain dicts and lists, so it can be stored as JSON
+        row["news_count"] = len(row.pop("news_articles") or [])
+        rows.append(row)
+    return put(SNAPSHOT_KEY, {"cards": rows, "sp500": ctx.sp500, "built_at": ctx.built_at})
+
+
+def load_snapshot() -> Optional[dict]:
+    """{"cards": [...], "calculated_at": datetime, "stale": bool, "sp500": {...}} or None."""
+    result = peek(SNAPSHOT_KEY)
+    if result is None:
+        return None
+    return {
+        "cards": result.value["cards"],
+        "sp500": result.value.get("sp500"),
+        "calculated_at": result.fetched_at,
+        "stale": datetime.now(timezone.utc) - result.fetched_at > SNAPSHOT_STALE_AFTER,
+    }
+
+
+def explain_opportunity(card: dict, rank: int, total: int, coverage_topics=None, include_strengths=True) -> list:
+    """
+    Plain sentences saying why a company was identified for research, built
+    only from its saved score card (and, if given, the market-coverage topics
+    that name it). Interpretation: the page labels it so.
+    """
+    why = [f"Ranks {rank} of {total} companies you don't hold, with a Research Confidence Score "
+           f"of {card['overall']}/100."]
+    strong = [f"{c['name'].lower()} ({c['score']:.0f})" for c in card["categories"]
+              if c["score"] is not None and c["score"] >= 75]
+    if strong:
+        why.append("Strongest areas: " + ", ".join(strong) + ".")
+    if include_strengths:  # the company page lists all strengths separately
+        why.extend(card["strengths"][:3])
+    if coverage_topics:
+        why.append("Named in current market coverage: " + ", ".join(coverage_topics) + ".")
+    return why

@@ -59,6 +59,10 @@
                         <a class="nav-link {% if request.blueprint == 'market' %}active{% endif %}"
                            href="{{ url_for('market.index') }}">Markets</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.blueprint == 'research' %}active{% endif %}"
+                           href="{{ url_for('research.index') }}">Research</a>
+                    </li>
                     {% endif %}
                     <!-- More links are added here as each section is built.
                          We don't show links to pages that don't exist yet. -->

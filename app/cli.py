@@ -104,8 +104,9 @@ def register_research_commands(app) -> None:
             raise click.BadParameter(f"{explain.upper()} is not in data/universe.csv", param_hint="--explain")
         click.echo("Gathering data (cached where possible; fresh news is spaced out to respect Finnhub's 60 calls a minute)...")
         started = time.time()
-        cards, ctx = scoring.score_universe(news_pause=1.1)
-        click.echo(f"Scored {len(cards)} companies in {time.time() - started:.0f}s.\n")
+        cards, ctx = scoring.score_universe(news_pause=1.1, save=True)
+        click.echo(f"Scored {len(cards)} companies in {time.time() - started:.0f}s "
+                   "and saved them for the Research page.\n")
 
         if explain:
             card = next(c for c in cards if c.ticker == explain.upper())

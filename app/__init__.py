@@ -48,6 +48,7 @@ def create_app(config_class=Config):
     from app.routes.market import market_bp
     from app.routes.news import news_bp
     from app.routes.portfolio import portfolio_bp
+    from app.routes.research import research_bp
     from app.routes.stocks import stocks_bp
 
     app.register_blueprint(main_bp)
@@ -56,6 +57,7 @@ def create_app(config_class=Config):
     app.register_blueprint(stocks_bp)
     app.register_blueprint(news_bp)
     app.register_blueprint(market_bp)
+    app.register_blueprint(research_bp)
 
     # Terminal commands, e.g. `flask --app run refresh-fundamentals` (app/cli.py).
     from app.cli import register_cli, register_research_commands

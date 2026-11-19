@@ -449,3 +449,31 @@ Phase 1 complete.
 **Testing**
 - Unit tests on an invented 7-company world with hand-checkable answers: band edges, every health sub-score, the median comparison (a loss-maker is excluded from peers), the small-bank-group note, news formulas, too-few and unavailable news left out (4 of 5 categories, weights rescaled), outlook cut-offs, and every risk/strength sentence traced to its number.
 - Live, all 64 companies: first run 123 s (fresh news spaced for Finnhub), repeat 2 s from cache. 14 Positive · 44 Neutral · 6 Negative; scores 37–75, median 59; all 5 categories used for every company. Sector averages span 50–66, so no sector is favored by construction.
+
+---
+
+## 2026-11-19 — Phase 6C: Research pages + diversification check (Phase 6 complete)
+
+**Before starting:** Logan committed 6B (67683df) and said "Please start phase 6c". No install.
+
+**Design decision: pages read a saved batch.** Scoring all 64 companies needs about 64 news calls and Finnhub allows 60 per minute, so a page can't score on the fly. `flask --app run research-scores` now saves the whole batch ("snapshot"); the pages read it and add live (delayed) prices and news only for what they show. The page states when scores were calculated and warns if the batch is more than a day old.
+
+**What we built**
+- `app/services/cache.py`: `put(key, value)` (store something we calculated ourselves) and `peek(key)` (read it back however old it is).
+- `app/services/scoring.py`: `score_universe(save=True)`, `save_snapshot()` / `load_snapshot()` (cards stored as plain dicts, without news articles to keep it small), and `explain_opportunity()`: "why identified" sentences built only from the score card (rank among companies you don't hold, strongest categories, top strengths, and the market-coverage topics that name the company). New risk sentence: net income fell 10% or more.
+- `app/routes/research.py` (new): `/research/`: companies you **don't hold** with a positive research outlook (≥ 65), highest first, each with live price + time, why it was identified (labeled interpretation), key risks, score + five category meters, and a **concentration check**; plus a filterable table of all 64 (sector, outlook, hide holdings; "You hold" badges). `/research/<ticker>`: full research page.
+- **Diversification check** (`concentration_check`): uses `sector_exposure()` from 5D. At or above **25%** of portfolio value in that sector → amber "⚠ Concentration check" warning; below → states the share; none → "you don't hold any {sector} stocks directly" (and only claims "a new sector for your portfolio" when the user holds no funds, because a fund like SPY contains every sector); no holdings → invitation. Funds are always mentioned as possibly hiding more exposure. Facts about the user's portfolio, never advice.
+- Templates: `research/index.html`, `research/company.html` (score summary, why / strengths / risks, every category's rules and points like `--explain`, statements table + calculated metrics with formulas on hover, this week's news with sentiment tags, links to the stock chart and market developments), and `research/_macros.html` (outlook badge, category meters, concentration box, live price, disclaimer box, shared by both pages). Disclaimer shown prominently on both. "Research" nav link; styles.
+
+**Problems found in screenshots, and fixes**
+- Category names were cut off in the meters ("Industry & market conditio…") → short labels, full name on hover.
+- "You don't hold any Healthcare stocks, so this would be a new sector" overclaimed for a user holding SPY → "directly", and the "new sector" claim only without funds.
+- On the company page the "why" bullets repeated the strengths listed right below → the company page's "why" keeps rank, strongest areas, and coverage only.
+- SLB's net income fell 24.4% but no risk mentioned it → new rule (≥ 10% drop).
+
+**Testing (in-memory database seeded read-only with a copy of the real cache, so no test user touches the real database and no extra API calls are spent)**
+- `put`/`peek` round trip; missing batch → None; a 30-hour-old batch flagged stale.
+- Concentration levels: heavy (45.8%), some (10%), none, no holdings.
+- `/research/` for a user holding AAPL, MSFT, XOM, SPY: 12 opportunities, none held; heavy warning on a Technology company; table 64 rows; filters Energy → 4, hide held → 61, Positive → 14. `/research/SLB`: 5 category tables, statements, metrics, news, concentration; AAPL page marked "You hold"; JPM bank notes; `/research/ZZZZ` → 404; user without holdings → invitation; no saved batch → "not calculated yet"; logged out → login. All older pages still 200. Desktop and 390 px phone screenshots checked.
+
+**Phase 6 is complete:** curated universe, hybrid fundamentals, the Research Confidence Score, and research pages with a diversification check.

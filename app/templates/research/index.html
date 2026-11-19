@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% from "research/_macros.html" import outlook_badge, category_bars, concentration, live_price, disclaimer_box %}
+{% block title %}Research{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <p class="mm-eyebrow mb-1">Section D</p>
+    <h1 class="h3 mb-0">Investment research</h1>
+</div>
+{{ disclaimer_box(disclaimer) }}
+
+{% if not snap %}
+<div class="mm-card text-center py-5">
+    <h2 class="h5 mb-2">Research scores haven't been calculated yet</h2>
+    <p class="mm-muted mb-0">Scores are calculated in one batch for all 64 companies, so pages stay fast and within the
+        news provider's limits. <span class="mm-row-sub">(Developer: run <code>flask --app run research-scores</code>.)</span></p>
+</div>
+{% else %}
+
+{# ---- Provenance ---- #}
+<div class="mm-data-note mb-4 {% if snap.stale %}is-warn{% endif %}">
+    <span class="badge mm-badge-interp">Interpretation</span>
+    <span>Scores were calculated {{ snap.calculated_at|et_time }} by MarketMind's published rules from: company statements
+        (Financial Modeling Prep or Yahoo Finance), delayed prices and 1-year price history (Yahoo Finance), this week's company
+        news (Finnhub), and current market developments.</span>
+    {% if snap.stale %}<span><strong>These scores are more than a day old;</strong> prices and news may have changed since.</span>{% endif %}
+    <span>Prices shown on each company are live (delayed).</span>
+</div>
+
+{# ---- Opportunities ---- #}
+<div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mm-section-title">
+    <h2 class="h6 fw-semibold mb-0">Companies worth researching</h2>
+    <span class="mm-group-note">
+        {% if fallback %}No company you don't hold reaches a positive outlook right now; these are the highest scores.
+        {% else %}Companies you don't hold with a positive research outlook (score 65 or more), highest first.{% endif %}
+    </span>
+</div>
+{% for o in opportunities %}
+{% set card = o.card %}
+<section class="mm-card mb-3">
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="d-flex flex-wrap align-items-baseline gap-2">
+                <a class="h5 mb-0 mm-ticker mm-ticker-link" href="{{ url_for('research.company', ticker=card.ticker) }}">{{ card.ticker }}</a>
+                <span class="fw-semibold">{{ card.name }}</span>
+            </div>
+            <div class="mm-row-sub mb-1">{{ card.sector }} · {{ card.industry }}</div>
+            <div class="small mb-3">{{ live_price(o.quote) }}</div>
+
+            <div class="mm-dev-col-title"><span class="badge mm-badge-interp me-1">Interpretation</span> Why it was identified</div>
+            <ul class="mm-why">{% for line in o.why %}<li>{{ line }}</li>{% endfor %}</ul>
+
+            {% if card.risks %}
+            <div class="mm-dev-col-title mt-3">Key risks</div>
+            <ul class="mm-why mm-why-risk">{% for r in card.risks[:3] %}<li>{{ r }}</li>{% endfor %}</ul>
+            {% if card.risks|length > 3 %}<div class="mm-row-sub">{{ card.risks|length - 3 }} more on the company page.</div>{% endif %}
+            {% endif %}
+        </div>
+        <div class="col-lg-5">
+            <div class="d-flex align-items-baseline gap-2 flex-wrap">
+                <span class="mm-score-big">{{ card.overall }}</span><span class="mm-muted">/ 100</span>
+                {{ outlook_badge(card, outlook_class) }}
+            </div>
+            <div class="mm-row-sub mb-2">{{ card.categories_used }} of 5 categories · statements from {{ card.source }}</div>
+            {{ category_bars(card) }}
+            <div class="mt-3">{{ concentration(o.check, card.sector, threshold) }}</div>
+            <div class="d-flex gap-2 mt-3">
+                <a class="btn btn-success btn-sm" href="{{ url_for('research.company', ticker=card.ticker) }}">Full research breakdown</a>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('stocks.detail', ticker=card.ticker) }}">Price chart</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endfor %}
+
+{# ---- All companies ---- #}
+<div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mm-section-title mt-4">
+    <h2 class="h6 fw-semibold mb-0">All {{ snap.cards|length }} research companies</h2>
+    <span class="mm-group-note">Includes companies you hold, marked “You hold”.</span>
+</div>
+<form method="get" class="mm-card mm-filter-bar mb-3" aria-label="Filter research companies">
+    <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-4">
+            <label class="form-label" for="f-sector">Sector</label>
+            <select class="form-select form-select-sm" id="f-sector" name="sector">
+                <option value="">All sectors</option>
+                {% for s in sectors %}<option value="{{ s }}" {% if filters.sector == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="f-outlook">Outlook</label>
+            <select class="form-select form-select-sm" id="f-outlook" name="outlook">
+                <option value="">All</option>
+                {% for o in ["Positive", "Neutral", "Negative"] %}<option value="{{ o }}" {% if filters.outlook == o %}selected{% endif %}>{{ o }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-8 col-md-3">
+            <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" id="f-held" name="hide_held" value="1" {% if filters.hide_held %}checked{% endif %}>
+                <label class="form-check-label small" for="f-held">Hide companies I hold</label>
+            </div>
+        </div>
+        <div class="col-4 col-md-2 d-flex gap-1">
+            <button type="submit" class="btn btn-success btn-sm flex-grow-1">Apply</button>
+            {% if filters.sector or filters.outlook or filters.hide_held %}<a class="btn btn-outline-secondary btn-sm" href="{{ url_for('research.index') }}" title="Clear filters">✕</a>{% endif %}
+        </div>
+    </div>
+</form>
+<div class="mm-card p-0 mb-3">
+    <div class="table-responsive">
+        <table class="table mm-table mm-table-compact align-middle mb-0">
+            <thead>
+                <tr><th>Company</th><th>Sector</th><th class="text-end">Score</th><th>Outlook</th>
+                    {% for c in snap.cards[0].categories %}<th class="text-end" title="{{ c.name }} ({{ c.weight }}%)">{{ c.name.split(' ')[0] }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+                {% for card in table %}
+                <tr>
+                    <td class="text-nowrap">
+                        <a class="mm-ticker mm-ticker-link" href="{{ url_for('research.company', ticker=card.ticker) }}">{{ card.ticker }}</a>
+                        <span class="mm-row-sub"> {{ card.name }}</span>
+                        {% if card.ticker in held %}<span class="mm-held-badge ms-1">You hold</span>{% endif %}
+                    </td>
+                    <td class="small">{{ card.sector }}</td>
+                    <td class="text-end fw-semibold mm-num">{{ card.overall if card.overall is not none else "—" }}</td>
+                    <td>{% if card.outlook %}<span class="badge mm-lean mm-lean-{{ outlook_class.get(card.outlook, 'either') }}">{{ card.outlook }}</span>{% else %}—{% endif %}</td>
+                    {% for c in card.categories %}<td class="text-end mm-num small">{{ "%.0f"|format(c.score) if c.score is not none else "—" }}</td>{% endfor %}
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-center mm-muted py-4">No companies match these filters.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<p class="small mm-muted mb-0">
+    How the score works: financial health {{ weights.health }}% · industry &amp; market conditions {{ weights.industry }}% ·
+    news &amp; catalysts {{ weights.news }}% · valuation {{ weights.valuation }}% · historical performance &amp; risk {{ weights.performance }}%.
+    Each category is the average of rule-based sub-scores; missing data is left out, never counted as zero. Open a company to see every rule and point.
+</p>
+{% endif %}
+{% endblock %}

@@ -15,6 +15,9 @@ Usage:
     result.from_cache   # True if we didn't call the provider this time
     result.stale        # True if older than the TTL (provider failed)
     result.error        # provider error message when stale, else None
+
+put(key, value) stores something we calculated ourselves; peek(key) reads it
+back regardless of age (both used for the saved research-score batch).
 """
 import json
 import logging
@@ -119,6 +122,31 @@ def get_or_fetch(key: str, ttl_seconds: int, fetch: Callable[[], Any]) -> CacheR
     with _lock:
         _memory[key] = (value, now)
     return CacheResult(value, now)
+
+
+def put(key: str, value: Any) -> datetime:
+    """Store a value MarketMind calculated itself (not fetched from a provider),
+    e.g. the batch of research scores. Returns the time it was stored."""
+    now = datetime.now(timezone.utc)
+    _write_db(key, value, now)
+    with _lock:
+        _memory[key] = (value, now)
+    return now
+
+
+def peek(key: str) -> Optional[CacheResult]:
+    """The stored value however old it is, or None if nothing was ever stored.
+    The caller decides whether it's too old to show (and says so on the page)."""
+    with _lock:
+        hit = _memory.get(key)
+    if hit:
+        return CacheResult(hit[0], hit[1], from_cache=True)
+    stored = _read_db(key)
+    if stored is None:
+        return None
+    with _lock:
+        _memory[key] = stored
+    return CacheResult(stored[0], stored[1], from_cache=True)
 
 
 def clear_memory() -> None:

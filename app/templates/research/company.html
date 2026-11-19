@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% from "research/_macros.html" import outlook_badge, category_bars, concentration, live_price, disclaimer_box %}
+{% block title %}{{ company.ticker if company else missing }} research{% endblock %}
+
+{% block content %}
+{% if missing %}
+<div class="mm-card text-center py-5">
+    <h1 class="h4 mb-2">{{ missing }} isn't in the research universe</h1>
+    <p class="mm-muted mb-3">Research scores cover the 64 companies in MarketMind's curated list.</p>
+    <a class="btn btn-outline-secondary" href="{{ url_for('research.index') }}">Back to research</a>
+</div>
+{% else %}
+
+{# ---- formatting helpers ---- #}
+{% macro usd(v) %}{% if v is none %}—{% elif v < 0 %}-${{ (-v)|big_number }}{% else %}${{ v|big_number }}{% endif %}{% endmacro %}
+{% set PCT = ["revenue_growth", "revenue_cagr_3y", "net_income_growth", "net_margin", "roe", "fcf_margin", "fcf_yield"] %}
+{% macro metric_value(m) %}
+{%- if m.value is none -%}—
+{%- elif m.key in PCT -%}{{ "%.1f"|format(m.value * 100) }}%
+{%- elif m.key == "free_cash_flow" -%}{{ usd(m.value) }}
+{%- elif m.key == "profitable_years" -%}{{ m.value|int }} {{ m.note }}
+{%- else -%}{{ "%.2f"|format(m.value) }}
+{%- endif -%}
+{% endmacro %}
+
+<div class="mb-2">
+    <p class="mm-eyebrow mb-1">Section D · Research</p>
+    <div class="d-flex flex-wrap align-items-baseline gap-2">
+        <h1 class="h3 mb-0"><span class="mm-ticker">{{ company.ticker }}</span> <span class="fw-normal">{{ company.name }}</span></h1>
+        {% if is_held %}<span class="mm-held-badge">You hold this company</span>{% endif %}
+    </div>
+    <div class="mm-row-sub">{{ company.sector }} · {{ company.industry }}</div>
+    <div class="small mt-1">{{ live_price(quote) }}</div>
+    <div class="d-flex flex-wrap gap-2 mt-2">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('stocks.detail', ticker=company.ticker) }}">Price chart &amp; statistics</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('market.developments') }}">Market developments</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('research.index') }}">All research</a>
+    </div>
+</div>
+<div class="mt-3">{{ disclaimer_box(disclaimer) }}</div>
+
+{% if not card %}
+<div class="mm-card mb-4"><p class="mb-0 mm-muted">No saved Research Confidence Score yet for {{ company.ticker }}.
+    <span class="mm-row-sub">(Developer: run <code>flask --app run research-scores</code>.)</span></p></div>
+{% else %}
+<div class="row g-4 mb-4">
+    {# ---- Score summary ---- #}
+    <div class="col-lg-4">
+        <div class="mm-card h-100">
+            <div class="mm-dev-col-title"><span class="badge mm-badge-interp me-1">Interpretation</span> Research Confidence Score</div>
+            <div class="d-flex align-items-baseline gap-2 flex-wrap">
+                <span class="mm-score-big">{{ card.overall if card.overall is not none else "—" }}</span><span class="mm-muted">/ 100</span>
+                {{ outlook_badge(card, outlook_class) }}
+            </div>
+            <div class="mm-row-sub mb-3">{{ card.categories_used }} of 5 categories · calculated {{ snap.calculated_at|et_time }}{% if snap.stale %} (more than a day ago){% endif %}</div>
+            {{ category_bars(card) }}
+        </div>
+    </div>
+    {# ---- Why / strengths / risks / concentration ---- #}
+    <div class="col-lg-8">
+        <div class="mm-card h-100">
+            {% if why %}
+            <div class="mm-dev-col-title"><span class="badge mm-badge-interp me-1">Interpretation</span> Why it may be worth researching</div>
+            <ul class="mm-why">{% for line in why %}<li>{{ line }}</li>{% endfor %}</ul>
+            {% elif is_held %}
+            <p class="small mm-muted">You already hold {{ company.ticker }}, so it isn't listed as a new research idea. Its score is shown for reference.</p>
+            {% endif %}
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <div class="mm-dev-col-title">Strengths</div>
+                    {% if card.strengths %}<ul class="mm-why">{% for s in card.strengths %}<li>{{ s }}</li>{% endfor %}</ul>
+                    {% else %}<p class="small mm-muted">None flagged by the rules.</p>{% endif %}
+                </div>
+                <div class="col-md-6">
+                    <div class="mm-dev-col-title">Key risks</div>
+                    {% if card.risks %}<ul class="mm-why mm-why-risk">{% for r in card.risks %}<li>{{ r }}</li>{% endfor %}</ul>
+                    {% else %}<p class="small mm-muted">None flagged by the rules.</p>{% endif %}
+                </div>
+            </div>
+            {% if not is_held %}<div class="mt-2">{{ concentration(check, company.sector, threshold) }}</div>{% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---- Every rule and point ---- #}
+<div class="d-flex justify-content-between align-items-baseline mm-section-title">
+    <h2 class="h6 fw-semibold mb-0">How the score was calculated</h2>
+    <span class="mm-group-note">Each category is the average of its sub-scores; missing data is left out</span>
+</div>
+<div class="row row-cols-1 row-cols-xl-2 g-3 mb-4">
+    {% for c in card.categories %}
+    <div class="col">
+        <div class="mm-card h-100 p-0">
+            <div class="d-flex justify-content-between align-items-baseline px-3 pt-3">
+                <h3 class="h6 fw-semibold mb-0">{{ c.name }} <span class="mm-row-sub">· {{ c.weight }}% of the score</span></h3>
+                <span class="fw-semibold">{{ "%.0f"|format(c.score) if c.score is not none else "left out" }}</span>
+            </div>
+            <table class="table mm-table mm-table-compact mb-0 mt-1">
+                <thead><tr><th>Measure</th><th class="text-end">Value</th><th class="text-end">Points</th></tr></thead>
+                <tbody>
+                    {% for s in c.subs %}
+                    <tr>
+                        <td>{{ s.label }}
+                            <div class="mm-row-sub">{{ s.rule }}{% if s.context %} · {{ s.context }}{% endif %}</div></td>
+                        <td class="text-end mm-num small">{{ s.display }}</td>
+                        <td class="text-end mm-num fw-semibold">{{ "%.0f"|format(s.points) if s.points is not none else "—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if c.note %}<div class="mm-row-sub px-3 pb-3 pt-2">{{ c.note }}</div>{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ---- Statements: facts, then calculated metrics ---- #}
+<div class="d-flex justify-content-between align-items-baseline mm-section-title">
+    <h2 class="h6 fw-semibold mb-0">Financial statements <span class="badge mm-badge-delayed ms-1">Verified facts</span></h2>
+    <span class="mm-group-note">{% if record %}Annual statements from {{ record.source }}{% if record.fmp_note %} ({{ record.fmp_note }}){% endif %}{% endif %}</span>
+</div>
+{% if record and record.years %}
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="mm-card p-0 h-100">
+            <table class="table mm-table mm-table-compact mb-0">
+                <thead><tr><th>Fiscal year ending</th><th class="text-end">Revenue</th><th class="text-end">Net income</th><th class="text-end">Free cash flow</th></tr></thead>
+                <tbody>
+                    {% for y in record.years %}
+                    {% set fcf = (y.operating_cash_flow - (y.capital_expenditure or 0)|abs) if y.operating_cash_flow is not none else none %}
+                    <tr><td>{{ y.period_end }}</td><td class="text-end mm-num">{{ usd(y.revenue) }}</td>
+                        <td class="text-end mm-num">{{ usd(y.net_income) }}</td><td class="text-end mm-num">{{ usd(fcf) }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="mm-row-sub px-3 pb-3 pt-2">Free cash flow = operating cash flow − capital spending (MarketMind's calculation, the same for both providers).</div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="mm-card h-100">
+            <div class="mm-dev-col-title">Calculated from these statements{% if quote and quote.market_cap %} and the current market value{% endif %}</div>
+            <div class="mm-metric-grid">
+                {% for key, m in metrics.items() %}
+                <div class="mm-metric" title="{{ m.formula }}">
+                    <div class="mm-row-sub">{{ m.label }}</div>
+                    <div class="fw-semibold mm-num">{{ metric_value(m) }}</div>
+                    {% if m.value is none and m.note %}<div class="mm-row-sub">{{ m.note }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mm-row-sub mt-2">Hover a measure to see its formula. Banks show “—” where their statements aren't comparable.</div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="mm-card mb-4"><p class="mb-0 mm-muted">Statements: Data unavailable.</p></div>
+{% endif %}
+
+{# ---- News: facts with an interpretation tag ---- #}
+<div class="d-flex justify-content-between align-items-baseline mm-section-title">
+    <h2 class="h6 fw-semibold mb-0">This week's news <span class="badge mm-badge-delayed ms-1">Verified facts</span></h2>
+    <span class="mm-group-note">Finnhub · sentiment tags are MarketMind's interpretation</span>
+</div>
+<div class="mm-card mb-3">
+    {% if news_error %}<p class="mb-0 mm-muted">News: Data unavailable ({{ news_error }}).</p>
+    {% elif not news %}<p class="mb-0 mm-muted">No articles about {{ company.ticker }} in the last 7 days.</p>
+    {% else %}
+    {% for a in news %}
+    <div class="mm-dev-article">
+        <a class="mm-article-title" href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.headline }}</a>
+        <div class="mm-article-meta mt-1">{{ a.publisher }} · {{ a.published_at|fromiso|et_time if a.published_at else "time unavailable" }}
+            · <span class="mm-term mm-term-{{ a.sentiment }}">{{ a.sentiment }}</span> <span class="mm-row-sub">(interpretation)</span></div>
+    </div>
+    {% endfor %}
+    <a class="small" href="{{ url_for('news.index') }}">News on your holdings ↗</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
